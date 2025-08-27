@@ -583,12 +583,132 @@ def generate_share_report(analyzer):
     messages = [msg for msg in df['message'] if not msg.startswith('<Media omitted>')]
     
     common_topics = [
-        'modi', 'bjp', 'congress', 'trump', 'usa', 'china', 'pakistan', 'election', 'politics',
-        'stock', 'crypto', 'bitcoin', 'gold', 'investment', 'nifty', 'sensex', 'market',
-        'bangalore', 'mumbai', 'delhi', 'chennai', 'hyderabad', 'work', 'job', 'salary',
-        'movie', 'bollywood', 'cricket', 'ipl', 'kohli', 'food', 'biryani', 'restaurant',
-        'travel', 'vacation', 'house', 'rent', 'traffic', 'weather', 'rain', 'monsoon',
-        'festival', 'diwali', 'holi', 'wedding', 'family', 'friends', 'party', 'weekend'
+        # Politics & Government (Extended)
+        'modi', 'bjp', 'congress', 'aap', 'election', 'vote', 'parliament', 'politics', 'government', 
+        'rahul gandhi', 'amit shah', 'kejriwal', 'mamata', 'yogi', 'state election', 'lok sabha', 'rajya sabha',
+        'cm', 'pm', 'president', 'governor', 'minister', 'mla', 'mp', 'bjp congress', 'alliance', 'coalition',
+        'supreme court', 'high court', 'cbi', 'ed', 'income tax raid', 'corruption', 'scam',
+        
+        # Finance & Economy (Extended)
+        'stock', 'market', 'nifty', 'sensex', 'investment', 'mutual fund', 'sip', 'fd', 'ppf', 'nsc',
+        'crypto', 'bitcoin', 'ethereum', 'trading', 'portfolio', 'gold', 'silver', 'inflation', 'gst', 'budget',
+        'rupee', 'dollar', 'bank', 'loan', 'emi', 'insurance', 'tax', 'income tax', 'epf', 'pf',
+        'credit card', 'debit card', 'upi', 'paytm', 'gpay', 'phonepe', 'aadhar', 'pan card',
+        'rbi', 'repo rate', 'interest rate', 'recession', 'bear market', 'bull market', 'ipo',
+        
+        # International (Extended)
+        'usa', 'america', 'trump', 'biden', 'china', 'pakistan', 'ukraine', 'russia', 'israel',
+        'middle east', 'europe', 'japan', 'singapore', 'dubai', 'saudi', 'immigration', 'visa',
+        'h1b', 'green card', 'canada', 'australia', 'uk', 'germany', 'france', 'switzerland',
+        'world war', 'nato', 'un', 'g20', 'brics', 'asean',
+        
+        # Cities & States (Extended)
+        'bangalore', 'bengaluru', 'mumbai', 'delhi', 'chennai', 'hyderabad', 'pune', 'kolkata',
+        'gurgaon', 'noida', 'karnataka', 'maharashtra', 'tamil nadu', 'kerala', 'gujarat', 'rajasthan',
+        'up', 'bihar', 'west bengal', 'telangana', 'andhra pradesh', 'odisha', 'assam', 'punjab',
+        'haryana', 'madhya pradesh', 'uttarakhand', 'himachal pradesh', 'goa', 'jharkhand', 'chhattisgarh',
+        'jammu kashmir', 'ladakh', 'delhi ncr', 'tier 2 city', 'metro city',
+        
+        # Technology & Work (Extended)
+        'work', 'job', 'salary', 'appraisal', 'promotion', 'interview', 'tech', 'software', 'ai',
+        'google', 'microsoft', 'amazon', 'infosys', 'tcs', 'wipro', 'startup', 'coding', 'python',
+        'java', 'cloud', 'aws', 'azure', 'meeting', 'office', 'wfh', 'remote', 'onsite',
+        'layoffs', 'hiring', 'hr', 'boss', 'manager', 'team lead', 'resignation', 'notice period',
+        'chatgpt', 'openai', 'machine learning', 'data science', 'blockchain', 'metaverse',
+        'linkedin', 'naukri', 'glassdoor', 'referral', 'interview prep', 'coding round',
+        
+        # Entertainment & Sports (Extended)
+        'movie', 'bollywood', 'hollywood', 'netflix', 'amazon prime', 'hotstar', 'film', 'actor',
+        'cricket', 'ipl', 'world cup', 'kohli', 'dhoni', 'rohit', 'football', 'fifa', 'olympics',
+        'tennis', 'badminton', 'kabaddi', 'hockey', 'sports', 'rcb', 'csk', 'mi', 'kkr',
+        'youtube', 'instagram', 'facebook', 'twitter', 'snapchat', 'tiktok', 'reel', 'story',
+        'series', 'web series', 'ott', 'trailer', 'box office', 'oscar', 'national award',
+        'south movie', 'dubbed', 'subtitles', 'theater', 'multiplex', 'pvr', 'inox',
+        
+        # Food & Culture (Extended)
+        'food', 'biryani', 'dosa', 'samosa', 'chai', 'coffee', 'restaurant', 'zomato', 'swiggy',
+        'lunch', 'dinner', 'breakfast', 'street food', 'festival', 'diwali', 'holi', 'eid',
+        'ganesh chaturthi', 'durga puja', 'navratri', 'dussehra', 'karva chauth', 'wedding',
+        'north indian', 'south indian', 'gujarati', 'punjabi', 'bengali', 'maharashtrian',
+        'thali', 'butter chicken', 'paneer', 'dal', 'rice', 'roti', 'naan', 'pizza', 'burger',
+        'sweets', 'mithai', 'gulab jamun', 'rasgulla', 'laddu', 'home cooked', 'mom food',
+        
+        # Transportation & Travel (Extended)
+        'uber', 'ola', 'auto', 'metro', 'train', 'flight', 'airport', 'traffic', 'petrol',
+        'diesel', 'car', 'bike', 'travel', 'vacation', 'holiday', 'goa', 'kerala', 'kashmir',
+        'himachal', 'uttarakhand', 'rajasthan', 'abroad', 'booking', 'makemytrip', 'goibibo',
+        'irctc', 'tatkal', 'waiting list', 'confirmed ticket', 'cancellation', 'refund',
+        'road trip', 'bike trip', 'solo travel', 'group trip', 'honeymoon', 'family trip',
+        'bus', 'sleeper', 'ac', 'general', 'first class', 'business class', 'economy',
+        
+        # Daily Life (Extended)
+        'house', 'rent', 'flat', 'apartment', 'pg', 'roommate', 'electricity', 'water', 'wifi',
+        'shopping', 'flipkart', 'amazon', 'myntra', 'grocery', 'vegetables', 'market',
+        'hospital', 'doctor', 'medicine', 'health', 'gym', 'fitness', 'maid', 'cook', 'driver',
+        'maintenance', 'society', 'security', 'lift', 'parking', 'power cut', 'water shortage',
+        'gas cylinder', 'bisleri', 'newspaper', 'milk', 'bread', 'grocery delivery',
+        
+        # Social & Personal (Extended)
+        'family', 'parents', 'marriage', 'relationship', 'friends', 'party', 'weekend', 'birthday',
+        'anniversary', 'plan', 'tomorrow', 'tonight', 'meeting', 'college', 'school', 'education',
+        'exam', 'results', 'admission', 'baby', 'pregnancy', 'delivery', 'naming ceremony',
+        'thread ceremony', 'engagement', 'bachelor party', 'bachelorette', 'sangam', 'mehendi',
+        'gossip', 'fight', 'patch up', 'breakup', 'dating', 'tinder', 'bumble', 'arranged marriage',
+        
+        # Health & Wellness (Extended)
+        'covid', 'vaccine', 'booster', 'mask', 'sanitizer', 'fever', 'cough', 'cold',
+        'headache', 'stomach pain', 'bp', 'diabetes', 'cholesterol', 'thyroid', 'weight loss',
+        'diet', 'exercise', 'yoga', 'meditation', 'mental health', 'stress', 'anxiety',
+        'sleep', 'insomnia', 'vitamin d', 'calcium', 'protein', 'supplements',
+        
+        # Weather & Seasons (Extended)
+        'weather', 'rain', 'monsoon', 'summer', 'winter', 'heat', 'cold', 'humidity', 'climate',
+        'cyclone', 'flood', 'drought', 'temperature', 'weather forecast', 'imd', 'heatwave',
+        'thunderstorm', 'lightning', 'hail', 'fog', 'pollution', 'aqi', 'air quality',
+        
+        # Religion & Spirituality (Extended)
+        'temple', 'church', 'mosque', 'gurudwara', 'god', 'prayer', 'bhajan', 'mandir', 'devotion',
+        'spiritual', 'meditation', 'yoga', 'jai shri ram', 'om namah shivaya', 'allah',
+        'jesus', 'waheguru', 'hanuman', 'ganesha', 'shiva', 'vishnu', 'krishna', 'rama',
+        'good morning', 'good night', 'blessed', 'grace', 'miracle', 'faith', 'karma',
+        
+        # Education & Career (Extended)
+        'jee', 'neet', 'cat', 'gate', 'upsc', 'ssc', 'ibps', 'bank exam', 'government job',
+        'private job', 'mba', 'engineering', 'medical', 'ca', 'cs', 'cfa', 'degree',
+        'masters', 'phd', 'research', 'scholarship', 'student loan', 'fees', 'hostel',
+        'placement', 'campus', 'internship', 'fresher', 'experienced', 'skill development',
+        
+        # Current Affairs & News (Extended)
+        'news', 'breaking news', 'update', 'pandemic', 'lockdown', 'unlock', 'economy',
+        'recession', 'growth', 'development', 'budget', 'union budget', 'economic survey',
+        'gdp', 'inflation', 'unemployment', 'startup ecosystem', 'unicorn', 'ipo listing',
+        'market crash', 'sensex fall', 'rupee fall', 'oil prices', 'crude oil',
+        
+        # Daily Communication & Greetings
+        'good morning', 'good night', 'good afternoon', 'good evening', 'namaste', 'hello',
+        'how are you', 'what\'s up', 'where are you', 'come home', 'reached safely', 'busy',
+        'call me', 'missed call', 'voice message', 'video call', 'status', 'dp', 'profile pic',
+        
+        # Tech & Digital Life
+        'phone', 'mobile', 'smartphone', 'iphone', 'samsung', 'oneplus', 'xiaomi', 'oppo', 'vivo',
+        'recharge', 'wifi', 'network', 'jio', 'airtel', 'vi', 'bsnl', 'broadband', 'fiber',
+        'laptop', 'computer', 'tablet', 'smartwatch', 'earbuds', 'headphones', 'charger',
+        'battery', 'screen guard', 'phone case', 'backup', 'storage', 'cloud',
+        
+        # Shopping & E-commerce
+        'amazon', 'flipkart', 'myntra', 'ajio', 'nykaa', 'big billion', 'great indian festival',
+        'sale', 'discount', 'coupon', 'cashback', 'emi', 'cod', 'delivery', 'return',
+        'exchange', 'warranty', 'review', 'rating', 'wish list', 'cart', 'checkout',
+        
+        # Humor & Entertainment
+        'meme', 'funny', 'joke', 'lol', 'rofl', 'haha', 'comedy', 'stand up', 'viral',
+        'trending', 'forward', 'share', 'tag', 'mention', 'like', 'comment', 'subscribe',
+        'influencer', 'content creator', 'blogger', 'vlogger', 'streamer',
+        
+        # Life Philosophy & Motivation
+        'life', 'success', 'failure', 'motivation', 'inspiration', 'quotes', 'thoughts',
+        'wisdom', 'advice', 'experience', 'lesson', 'growth', 'change', 'opportunity',
+        'challenge', 'struggle', 'achievement', 'goal', 'dream', 'passion', 'purpose'
     ]
     
     topic_counts = {}
@@ -680,18 +800,18 @@ def generate_share_report(analyzer):
     # Determine group name or use generic
     group_name = "WHATSAPP GROUP"
     
-    report = f"""## {group_name.upper()}: THE ULTIMATE PERSONALITY & TOPIC ANALYSIS 🎉
-Based on **{len(df):,} messages** from **{len(df['sender'].unique())} participants** over **{total_days} days**
+    report = f"""*{group_name.upper()}: THE ULTIMATE PERSONALITY & TOPIC ANALYSIS* 🎉
+Based on *{len(df):,} messages* from *{len(df['sender'].unique())} participants* over *{total_days} days*
 
-### 📊 GROUP DYNAMICS AT A GLANCE
-• **Daily average:** {msgs_per_day:.1f} messages ({activity_desc.replace('🔥', '').replace('💬', '').replace('😌', '').strip()})
+📊 *GROUP DYNAMICS AT A GLANCE*
+• *Daily average:* {msgs_per_day:.1f} messages ({activity_desc.replace('🔥', '').replace('💬', '').replace('😌', '').strip()})
 
-• **Peak activity:** {peak_hour}:00 on {peak_day}s ({time_behavior.replace('🌅', '').replace('🦉', '').replace('📱', '').strip()})
+• *Peak activity:* {peak_hour}:00 on {peak_day}s ({time_behavior.replace('🌅', '').replace('🦉', '').replace('📱', '').strip()})
 
-• **Most active day:** {peak_day} ({daily.max()} messages)
+• *Most active day:* {peak_day} ({daily.max()} messages)
 
-### 🏆 THE HALL OF FAME
-#### 🗣️ Top 5 Chatters"""
+🏆 *THE HALL OF FAME*
+🗣️ *Top 5 Chatters*"""
     
     for i, (_, row) in enumerate(top_5.iterrows()):
         nickname = ""
@@ -704,42 +824,42 @@ Based on **{len(df):,} messages** from **{len(df['sender'].unique())} participan
         elif row['name'] == max(exclamation_users, key=exclamation_users.get) if exclamation_users else "":
             nickname = " _(The Excitement King! ❗)_"
             
-        report += f"\n\n**{i+1}. {row['name']}** - {row['total_messages']} messages{nickname}"
-        report += f"\n\n• Peak hour: **{row['most_active_hour']}:00** on **{row['favorite_day']}s** | Avg: **{row['avg_message_length']:.0f} chars** per message"
+        report += f"\n\n*{i+1}. {row['name']}* - {row['total_messages']} messages{nickname}"
+        report += f"\n\n• Peak hour: *{row['most_active_hour']}:00* on *{row['favorite_day']}s* | Avg: *{row['avg_message_length']:.0f} chars* per message"
     
     # Add quiet members
     quiet_members = activity_df.tail(3)
     if len(quiet_members) > 0:
         quiet_names = ", ".join([row['name'] for _, row in quiet_members.iterrows()])
-        report += f"\n\n#### 🤐 The Silent Observers\n\n• {quiet_names} - 1 message each _(Lurkers!)_"
+        report += f"\n\n🤐 *The Silent Observers*\n\n• {quiet_names} - 1 message each _(Lurkers!)_"
     
-    report += f"\n\n### 🎭 PERSONALITY AWARDS\n#### 😄 Mood Meters"
+    report += f"\n\n🎭 *PERSONALITY AWARDS*\n😄 *Mood Meters*"
     
     if sentiments:
-        report += f"\n\n• **Most Positive Vibes:** "
+        report += f"\n\n• *Most Positive Vibes:* "
         pos_list = []
         for sender, score in most_positive.head(3).items():
-            pos_list.append(f"**{sender}** ({score:.3f})")
+            pos_list.append(f"*{sender}* ({score:.3f})")
         report += ", ".join(pos_list)
         
         most_negative = sender_sentiment.nsmallest(3)
-        report += f"\n\n• **Most Neutral/Negative:** "
+        report += f"\n\n• *Most Neutral/Negative:* "
         neg_list = []
         for sender, score in most_negative.items():
-            neg_list.append(f"**{sender}** ({score:.3f})")
+            neg_list.append(f"*{sender}* ({score:.3f})")
         report += ", ".join(neg_list)
     
     essay_writer = avg_msg_length.idxmax()
     short_writer = avg_msg_length.idxmin()
     
-    report += f"\n\n#### 🏅 Special Recognition\n\n• 📜 **Essay Writer:** **{essay_writer}** ({avg_msg_length.max():.0f} chars average - _writes novels!_)\n\n• 🔤 **Minimalist:** **{short_writer}** ({avg_msg_length.min():.0f} chars average - _master of brevity_)"
+    report += f"\n\n🏅 *Special Recognition*\n\n• 📜 *Essay Writer:* *{essay_writer}* ({avg_msg_length.max():.0f} chars average - _writes novels!_)\n\n• 🔤 *Minimalist:* *{short_writer}* ({avg_msg_length.min():.0f} chars average - _master of brevity_)"
     
     if emoji_users:
-        report += f"\n\n• 😂 **Emoji Champion:** **{max(emoji_users, key=emoji_users.get)}**"
+        report += f"\n\n• 😂 *Emoji Champion:* *{max(emoji_users, key=emoji_users.get)}*"
     if question_users:
-        report += f"\n\n• ❓ **Question Master:** **{max(question_users, key=question_users.get)}**"
+        report += f"\n\n• ❓ *Question Master:* *{max(question_users, key=question_users.get)}*"
     
-    report += f"\n\n### 🔥 WHAT YOU ACTUALLY TALK ABOUT"
+    report += f"\n\n🔥 *WHAT YOU ACTUALLY TALK ABOUT*"
     
     if sorted_topics:
         # Categorize topics
@@ -757,34 +877,34 @@ Based on **{len(df):,} messages** from **{len(df['sender'].unique())} participan
                 other_topics.append((topic, count))
         
         if political_topics:
-            report += f"\n\n#### 🗳️ Political & Current Affairs Obsession"
+            report += f"\n\n🗳️ *Political & Current Affairs Obsession*"
             for i, (topic, count) in enumerate(political_topics[:4], 1):
                 comment = " _(Following every update!)_" if i == 1 else ""
-                report += f"\n\n• **{topic}:** {count} mentions{comment}"
+                report += f"\n\n• *{topic}:* {count} mentions{comment}"
         
         if finance_topics:
-            report += f"\n\n#### 💰 Finance Bros Central"
+            report += f"\n\n💰 *Finance Bros Central*"
             for i, (topic, count) in enumerate(finance_topics[:3], 1):
                 comment = " _(Diamond hands! 💎)_" if 'crypto' in topic.lower() else ""
-                report += f"\n\n• **{topic}:** {count} mentions{comment}"
+                report += f"\n\n• *{topic}:* {count} mentions{comment}"
         
         if other_topics:
-            report += f"\n\n#### 🏠 Daily Life Topics"
+            report += f"\n\n🏠 *Daily Life Topics*"
             for i, (topic, count) in enumerate(other_topics[:3], 1):
-                report += f"\n\n• **{topic}:** {count} mentions"
+                report += f"\n\n• *{topic}:* {count} mentions"
     
     # Add drama analysis if available
     if drama_text:
         report += f"\n{drama_text}"
     
-    report += f"\n\n### 📈 GROUP BEHAVIORAL INSIGHTS\n#### ⏰ Time Patterns\n\n• {time_behavior}\n\n• **Most active day:** {peak_day} ({daily.max()} messages)\n\n• **Quietest day:** {daily.idxmin()} ({daily.min()} messages)\n\n#### 💬 Communication Style"
+    report += f"\n\n📈 *GROUP BEHAVIORAL INSIGHTS*\n⏰ *Time Patterns*\n\n• {time_behavior}\n\n• *Most active day:* {peak_day} ({daily.max()} messages)\n\n• *Quietest day:* {daily.idxmin()} ({daily.min()} messages)\n\n💬 *Communication Style*"
     
     if emoji_users:
-        report += f"\n\n• **Emoji Usage Leader:** **{max(emoji_users, key=emoji_users.get)}** _(The Visual Communicator)_"
+        report += f"\n\n• *Emoji Usage Leader:* *{max(emoji_users, key=emoji_users.get)}* _(The Visual Communicator)_"
     if question_users:
-        report += f"\n\n• **Most Questions Asked:** **{max(question_users, key=question_users.get)}** _(The Curious One)_"
+        report += f"\n\n• *Most Questions Asked:* *{max(question_users, key=question_users.get)}* _(The Curious One)_"
     if exclamation_users:
-        report += f"\n\n• **Most Exclamation Points:** **{max(exclamation_users, key=exclamation_users.get)}** _(The Hype Person!)_"
+        report += f"\n\n• *Most Exclamation Points:* *{max(exclamation_users, key=exclamation_users.get)}* _(The Hype Person!)_"
 
     # Group personality summary
     if sorted_topics:
@@ -800,7 +920,7 @@ Based on **{len(df):,} messages** from **{len(df['sender'].unique())} participan
     else:
         personality = "🤝 Balanced Social Circle"
 
-    report += f"\n\n### 🎯 THE REAL GROUP PERSONALITY\n**{personality}**\n_You're not just another group chat - you're a community with strong opinions and great energy!_\n\n### 🚀 Want YOUR group analyzed?\nGet your mind-blowing analysis FREE:\n👉 https://whatsapp-group-analyzer.streamlit.app\n\n_Discover who's really running your group!_ 📊✨"
+    report += f"\n\n🎯 *THE REAL GROUP PERSONALITY*\n*{personality}*\n_You're not just another group chat - you're a community with strong opinions and great energy!_\n\n🚀 *Want YOUR group analyzed?*\nGet your mind-blowing analysis FREE:\n👉 https://whatsapp-group-analyzer.streamlit.app\n\n_Discover who's really running your group!_ 📊✨"
     
     return report
 
