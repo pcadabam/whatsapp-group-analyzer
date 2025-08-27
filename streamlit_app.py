@@ -25,23 +25,12 @@ def main():
     st.markdown("""
     <div style="text-align: center; padding: 30px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; margin-bottom: 30px;">
         <h1 style="color: white; font-size: 2.5em; margin-bottom: 15px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">🕵️ Group Chat Secrets</h1>
-        <p style="color: white; font-size: 20px; margin-bottom: 20px; opacity: 0.9;">Find out who's REALLY running your WhatsApp group!</p>
         <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 15px; margin: 0 auto; max-width: 400px;">
-            <p style="color: white; font-weight: bold; margin: 0;">✨ Discover jaw-dropping insights that will shock your friends!</p>
+            <p style="color: white; font-weight: bold; margin: 0;">✨ Analyze your group chat dynamics and activity patterns</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Social proof
-    st.markdown("""
-    <div style="text-align: center; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 10px;">
-        <p style="margin: 0; color: #666; font-style: italic;">
-        "OMG this exposed everything about our group 😂" - Sarah M.<br>
-        "I can't believe how accurate this is!" - Ravi K.<br>
-        "Our group hasn't stopped talking about these results!" - Priya S.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
     
     
     # Simple instructions
@@ -50,24 +39,18 @@ def main():
         **Super easy:**
         1. Open your WhatsApp group
         2. Tap the group name → Export Chat
-        3. Choose "Without Media" 
-        4. Upload the ZIP file here!
+        3. Choose "Without Media"
+        4. Save the exported file to your device
+        5. Upload the ZIP file here!
         
         **⚠️ Important: If export doesn't work:**
-        1. Go to WhatsApp Settings → Account → Privacy → Advanced
-        2. Turn OFF "Protect IP address in calls" (if enabled)
-        3. Export your chat (it should work now)
-        4. Turn the privacy setting back ON after export
+        1. Tap on Group name → Advanced chat privacy → Off
+        2. Export your chat (it should work now)
+        3. Turn the privacy setting back ON after export
         
-        **🔒 Privacy Guarantee:**
-        - Files are processed securely and temporarily on our servers
-        - All files are automatically deleted immediately after analysis
-        - We never store, save, or keep your chat data
-        - No chat content is logged or retained beyond the analysis
-        - Your data is processed in-memory only and discarded 
+ 
         """)
         
-        st.info("💡 **Why turn off Advanced Privacy?** Some WhatsApp privacy settings can interfere with chat export functionality. It's safe to temporarily disable this for the export process.")
     
     # Privacy notice
     st.markdown("""
@@ -81,9 +64,8 @@ def main():
     """, unsafe_allow_html=True)
     
     uploaded_file = st.file_uploader(
-        "🚀 Drop your chat file here and let the magic begin!", 
-        type=['zip', 'txt'],
-        help="✨ Upload the ZIP file from WhatsApp and watch the secrets unfold!"
+        "Upload here", 
+        type=['zip', 'txt']
     )
     
     if uploaded_file is not None:
@@ -181,21 +163,37 @@ def main():
                 # Display the shareable report with contained styling
                 import re
                 
-                # Convert basic markdown to HTML for contained display
-                html_text = share_text
+                # Convert WhatsApp formatting to HTML
+                def whatsapp_to_html(text):
+                    """Convert WhatsApp formatting (*bold* _italic_ ~strikethrough~) to HTML"""
+                    # First, clean up excessive spacing
+                    text = re.sub(r'\n{3,}', '\n\n', text)
+                    
+                    # Escape HTML special characters first
+                    text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                    
+                    # Convert WhatsApp formatting to HTML
+                    # Handle nested formatting by processing in the right order
+                    # First handle combinations like *_text_* (bold+italic)
+                    text = re.sub(r'\*_([^_\n]+)_\*', r'<strong><em>\1</em></strong>', text)
+                    text = re.sub(r'_\*([^*\n]+)\*_', r'<em><strong>\1</strong></em>', text)
+                    
+                    # Then handle single formatting
+                    # Bold: *text* -> <strong>text</strong>
+                    text = re.sub(r'\*([^*\n]+)\*', r'<strong>\1</strong>', text)
+                    
+                    # Italic: _text_ -> <em>text</em>
+                    text = re.sub(r'_([^_\n]+)_', r'<em>\1</em>', text)
+                    
+                    # Strikethrough: ~text~ -> <s>text</s>
+                    text = re.sub(r'~([^~\n]+)~', r'<s>\1</s>', text)
+                    
+                    # Monospace: ```text``` -> <code>text</code>
+                    text = re.sub(r'```([^`\n]+)```', r'<code>\1</code>', text)
+                    
+                    return text
                 
-                # First, clean up excessive spacing
-                # Remove triple+ newlines and replace with double
-                html_text = re.sub(r'\n{3,}', '\n\n', html_text)
-                
-                # Convert headers first with minimal spacing
-                html_text = re.sub(r'^### (.*)', r'<h3 style="color: #2d3748; margin: 8px 0 2px 0; font-weight: 600;">\1</h3>', html_text, flags=re.MULTILINE)
-                html_text = re.sub(r'^#### (.*)', r'<h4 style="color: #4a5568; margin: 6px 0 1px 0; font-weight: 600;">\1</h4>', html_text, flags=re.MULTILINE)
-                html_text = re.sub(r'^## (.*)', r'<h2 style="color: #1a202c; margin: 10px 0 3px 0; font-weight: 700;">\1</h2>', html_text, flags=re.MULTILINE)
-                
-                # Convert bold and italic text
-                html_text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', html_text)
-                html_text = re.sub(r'_(.*?)_', r'<em>\1</em>', html_text)
+                html_text = whatsapp_to_html(share_text)
                 
                 # Handle line breaks more carefully
                 # Split into paragraphs and process
@@ -215,8 +213,8 @@ def main():
                                 processed_lines.append(line.strip())
                         processed_paragraphs.append('<br>'.join(processed_lines))
                 
-                html_text = '</p><p style="margin: 4px 0;">'.join(processed_paragraphs)
-                html_text = '<p style="margin: 4px 0;">' + html_text + '</p>'
+                html_text = '</p><p style="margin: 10px 0;">'.join(processed_paragraphs)
+                html_text = '<p style="margin: 10px 0;">' + html_text + '</p>'
                 
                 st.markdown(f"""
                 <div style="
@@ -228,7 +226,7 @@ def main():
                     box-shadow: 0 4px 12px rgba(37, 211, 102, 0.15);
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                     font-size: 16px;
-                    line-height: 1.3;
+                    line-height: 1.6;
                     color: #1a202c;
                 ">
                 {html_text}
@@ -357,17 +355,6 @@ def main():
         st.markdown("---")
         display_analytics_dashboard()
     
-    # Privacy footer
-    st.markdown("---")
-    st.markdown("""
-    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px; margin: 30px 0;">
-        <h4 style="color: #495057; margin-bottom: 10px;">🔒 Your Privacy is Our Priority</h4>
-        <p style="color: #6c757d; margin: 0; font-size: 14px;">
-        Files are processed temporarily on secure servers and automatically deleted after analysis.<br>
-        We never store, log, or retain your personal chat data. Your conversations are processed and discarded.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
 
 def display_overview(df, analyzer):
     col1, col2 = st.columns(2)
@@ -407,7 +394,7 @@ def display_top_chatters(analyzer):
     with col1:
         st.subheader("🥇 Top 10 Chatters")
         top_10 = activity_df.head(10)
-        st.dataframe(top_10, use_container_width=True)
+        st.dataframe(top_10, width='stretch')
     
     with col2:
         st.subheader("📊 Message Distribution")
@@ -906,6 +893,8 @@ def generate_share_report(analyzer):
     report = f"""*{group_name.upper()}: THE ULTIMATE PERSONALITY & TOPIC ANALYSIS* 🎉
 Based on *{len(df):,} messages* from *{len(df['sender'].unique())} participants* over *{total_days} days*
 
+--------------------
+
 📊 *GROUP DYNAMICS AT A GLANCE*
 • *Daily average:* {msgs_per_day:.1f} messages ({activity_desc.replace('🔥', '').replace('💬', '').replace('😌', '').strip()})
 
@@ -1023,7 +1012,7 @@ Based on *{len(df):,} messages* from *{len(df['sender'].unique())} participants*
     else:
         personality = "🤝 Balanced Social Circle"
 
-    report += f"\n\n🎯 *THE REAL GROUP PERSONALITY*\n*{personality}*\n_You're not just another group chat - you're a community with strong opinions and great energy!_\n\n🚀 *Want YOUR group analyzed?*\nGet your mind-blowing analysis FREE:\n👉 https://whatsapp-group-analyzer.streamlit.app\n\n_Discover who's really running your group!_ 📊✨"
+    report += f"\n\n--------------------\n\n🎯 *THE REAL GROUP PERSONALITY*\n*{personality}*\n_You're not just another group chat - you're a community with strong opinions and great energy!_\n\n--------------------\n\n🚀 *Want YOUR group analyzed?*\nGet your mind-blowing analysis FREE:\n👉 https://whatsapp-group-analyzer.streamlit.app\n\n_Discover who's really running your group!_ 📊✨"
     
     return report
 
