@@ -11,11 +11,19 @@ from analytics import log_usage_event, get_usage_stats, display_analytics_dashbo
 from security import file_validator, SecurityError
 
 st.set_page_config(
-    page_title="WhatsApp Group Analyzer",
+    page_title="WhatsApp Group Analyzer - Discover Your Group's Personality",
     page_icon="💬",
     layout="centered",  # Better for mobile
     initial_sidebar_state="collapsed"
 )
+
+# Add meta tags for better social sharing (limited support in Streamlit)
+st.markdown("""
+<meta property="og:title" content="WhatsApp Group Analyzer - Discover Your Group's Personality">
+<meta property="og:description" content="Analyze your WhatsApp group chat to discover who's the most active, sentiment analysis, hot topics, and fun personality awards. Free and secure!">
+<meta property="og:type" content="website">
+<meta name="description" content="Free WhatsApp group chat analyzer. Discover who's most active, sentiment analysis, hot topics, personality awards and more!">
+""", unsafe_allow_html=True)
 
 def main():
     # Track page view
