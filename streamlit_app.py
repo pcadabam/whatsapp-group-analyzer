@@ -112,27 +112,60 @@ def main():
                 # Show the actual report that will be shared - MAIN FOCUS
                 st.markdown("---")
                 
-                # Display the shareable report prominently
+                # Display the shareable report with contained styling
+                import re
+                
+                # Convert basic markdown to HTML for contained display
+                html_text = share_text
+                
+                # First, clean up excessive spacing
+                # Remove triple+ newlines and replace with double
+                html_text = re.sub(r'\n{3,}', '\n\n', html_text)
+                
+                # Convert headers first with minimal spacing
+                html_text = re.sub(r'^### (.*)', r'<h3 style="color: #2d3748; margin: 8px 0 2px 0; font-weight: 600;">\1</h3>', html_text, flags=re.MULTILINE)
+                html_text = re.sub(r'^#### (.*)', r'<h4 style="color: #4a5568; margin: 6px 0 1px 0; font-weight: 600;">\1</h4>', html_text, flags=re.MULTILINE)
+                html_text = re.sub(r'^## (.*)', r'<h2 style="color: #1a202c; margin: 10px 0 3px 0; font-weight: 700;">\1</h2>', html_text, flags=re.MULTILINE)
+                
+                # Convert bold and italic text
+                html_text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', html_text)
+                html_text = re.sub(r'_(.*?)_', r'<em>\1</em>', html_text)
+                
+                # Handle line breaks more carefully
+                # Split into paragraphs and process
+                paragraphs = html_text.split('\n\n')
+                processed_paragraphs = []
+                
+                for para in paragraphs:
+                    if para.strip():
+                        # For regular paragraphs, replace single newlines with spaces (for flowing text)
+                        # But keep bullet points on separate lines
+                        lines = para.split('\n')
+                        processed_lines = []
+                        for line in lines:
+                            if line.strip().startswith('•') or line.strip().startswith('<h') or line.strip().startswith('</h'):
+                                processed_lines.append(line.strip())
+                            else:
+                                processed_lines.append(line.strip())
+                        processed_paragraphs.append('<br>'.join(processed_lines))
+                
+                html_text = '</p><p style="margin: 4px 0;">'.join(processed_paragraphs)
+                html_text = '<p style="margin: 4px 0;">' + html_text + '</p>'
+                
                 st.markdown(f"""
                 <div style="
                     background: linear-gradient(135deg, #f8fafc, #f1f5f9);
                     padding: 25px;
-                    border-radius: 20px;
-                    border: 3px solid #25D366;
+                    border-radius: 15px;
+                    border: 2px solid #25D366;
                     margin: 20px 0;
-                    box-shadow: 0 8px 25px rgba(37, 211, 102, 0.2);
-                ">
-                <div style="
-                    white-space: pre-wrap;
+                    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.15);
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                     font-size: 16px;
-                    line-height: 1.5;
+                    line-height: 1.3;
                     color: #1a202c;
-                    background: white;
-                    padding: 20px;
-                    border-radius: 12px;
-                    border: 1px solid #e2e8f0;
-                ">{share_text}</div>
+                ">
+                {html_text}
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -642,76 +675,132 @@ def generate_share_report(analyzer):
     drama_text = ""
     if polarizing:
         top_drama = polarizing[0]
-        drama_text = f"\n🔥 DRAMA ALERT: {top_drama[0].capitalize()} creates the most heated debates! (σ={top_drama[1]:.3f})"
+        drama_text = f"🔥 DRAMA ALERT: {top_drama[0].capitalize()} creates the most heated debates! (σ={top_drama[1]:.3f})"
     
-    report = f"""🚨 GROUP CHAT SECRETS EXPOSED! 🚨
-
-🔥 CHAT KING/QUEEN: {top_chatter['name']} 
-👑 ABSOLUTELY DOMINATES with {top_chatter['total_messages']} messages!
-🕐 Most active: {top_chatter['most_active_hour']}:00 on {top_chatter['favorite_day']}s (we see you! 👀)
-
-📊 THE SHOCKING STATS:
-{len(df):,} messages analyzed • {len(df['sender'].unique())} people exposed • {total_days} days of drama
-{activity_desc}
-
-😇 WHO'S THE ANGEL VS DEVIL:
-😄 {most_pos} = Group's ray of sunshine!
-{"💥 This group has STRONG opinions about everything!" if sentiments else "😴 Pretty chill group overall"}
-
-🕵️ YOUR BIGGEST OBSESSIONS:"""
+    # Determine group name or use generic
+    group_name = "WHATSAPP GROUP"
     
-    if sorted_topics:
-        for i, (topic, count) in enumerate(sorted_topics[:3]):
-            if i == 0:
-                report += f"\n🥇 {topic.upper()}: {count} mentions (OBSESSED MUCH? 😂)"
-            elif i == 1:
-                report += f"\n🥈 {topic}: {count} mentions (runner-up addiction)"
-            else:
-                report += f"\n🥉 {topic}: {count} mentions (still pretty obsessed)"
-    
-    report += f"""
-{drama_text}
+    report = f"""## {group_name.upper()}: THE ULTIMATE PERSONALITY & TOPIC ANALYSIS 🎉
+Based on **{len(df):,} messages** from **{len(df['sender'].unique())} participants** over **{total_days} days**
 
-🕐 WHEN THE MAGIC HAPPENS:
-{time_behavior}
-Peak day: {peak_day} (when the tea gets REALLY hot! ☕)
+### 📊 GROUP DYNAMICS AT A GLANCE
+• **Daily average:** {msgs_per_day:.1f} messages ({activity_desc.replace('🔥', '').replace('💬', '').replace('😌', '').strip()})
 
-🏆 HALL OF FAME & SHAME:"""
+• **Peak activity:** {peak_hour}:00 on {peak_day}s ({time_behavior.replace('🌅', '').replace('🦉', '').replace('📱', '').strip()})
+
+• **Most active day:** {peak_day} ({daily.max()} messages)
+
+### 🏆 THE HALL OF FAME
+#### 🗣️ Top 5 Chatters"""
     
-    if emoji_users:
-        report += f"\n😂 Emoji Maniac: {max(emoji_users, key=emoji_users.get)} (can't speak without emojis!)"
-    if question_users:  
-        report += f"\n🤔 The Interrogator: {max(question_users, key=question_users.get)} (questions everything!)"
-    if exclamation_users:
-        report += f"\n🎉 Hype Beast: {max(exclamation_users, key=exclamation_users.get)} (always excited!)"
+    for i, (_, row) in enumerate(top_5.iterrows()):
+        nickname = ""
+        if i == 0:
+            nickname = " _(The Unstoppable Force)_"
+        elif row['name'] == max(emoji_users, key=emoji_users.get) if emoji_users else "":
+            nickname = " _(The Emoji Champion 😂)_"
+        elif row['name'] == max(question_users, key=question_users.get) if question_users else "":
+            nickname = " _(The Question Master)_"
+        elif row['name'] == max(exclamation_users, key=exclamation_users.get) if exclamation_users else "":
+            nickname = " _(The Excitement King! ❗)_"
+            
+        report += f"\n\n**{i+1}. {row['name']}** - {row['total_messages']} messages{nickname}"
+        report += f"\n\n• Peak hour: **{row['most_active_hour']}:00** on **{row['favorite_day']}s** | Avg: **{row['avg_message_length']:.0f} chars** per message"
+    
+    # Add quiet members
+    quiet_members = activity_df.tail(3)
+    if len(quiet_members) > 0:
+        quiet_names = ", ".join([row['name'] for _, row in quiet_members.iterrows()])
+        report += f"\n\n#### 🤐 The Silent Observers\n\n• {quiet_names} - 1 message each _(Lurkers!)_"
+    
+    report += f"\n\n### 🎭 PERSONALITY AWARDS\n#### 😄 Mood Meters"
+    
+    if sentiments:
+        report += f"\n\n• **Most Positive Vibes:** "
+        pos_list = []
+        for sender, score in most_positive.head(3).items():
+            pos_list.append(f"**{sender}** ({score:.3f})")
+        report += ", ".join(pos_list)
+        
+        most_negative = sender_sentiment.nsmallest(3)
+        report += f"\n\n• **Most Neutral/Negative:** "
+        neg_list = []
+        for sender, score in most_negative.items():
+            neg_list.append(f"**{sender}** ({score:.3f})")
+        report += ", ".join(neg_list)
     
     essay_writer = avg_msg_length.idxmax()
     short_writer = avg_msg_length.idxmin()
-    report += f"\n📚 Shakespeare: {essay_writer} ({avg_msg_length.max():.0f} chars avg - writes novels!)"
-    report += f"\n⚡ Telegram Style: {short_writer} ({avg_msg_length.min():.0f} chars avg - master of brevity)"
     
+    report += f"\n\n#### 🏅 Special Recognition\n\n• 📜 **Essay Writer:** **{essay_writer}** ({avg_msg_length.max():.0f} chars average - _writes novels!_)\n\n• 🔤 **Minimalist:** **{short_writer}** ({avg_msg_length.min():.0f} chars average - _master of brevity_)"
+    
+    if emoji_users:
+        report += f"\n\n• 😂 **Emoji Champion:** **{max(emoji_users, key=emoji_users.get)}**"
+    if question_users:
+        report += f"\n\n• ❓ **Question Master:** **{max(question_users, key=question_users.get)}**"
+    
+    report += f"\n\n### 🔥 WHAT YOU ACTUALLY TALK ABOUT"
+    
+    if sorted_topics:
+        # Categorize topics
+        political_topics = []
+        finance_topics = []
+        other_topics = []
+        
+        for topic, count in sorted_topics:
+            topic_lower = topic.lower()
+            if any(word in topic_lower for word in ['trump', 'modi', 'election', 'politics', 'bjp', 'congress']):
+                political_topics.append((topic, count))
+            elif any(word in topic_lower for word in ['stock', 'crypto', 'bitcoin', 'investment', 'market', 'gold']):
+                finance_topics.append((topic, count))
+            else:
+                other_topics.append((topic, count))
+        
+        if political_topics:
+            report += f"\n\n#### 🗳️ Political & Current Affairs Obsession"
+            for i, (topic, count) in enumerate(political_topics[:4], 1):
+                comment = " _(Following every update!)_" if i == 1 else ""
+                report += f"\n\n• **{topic}:** {count} mentions{comment}"
+        
+        if finance_topics:
+            report += f"\n\n#### 💰 Finance Bros Central"
+            for i, (topic, count) in enumerate(finance_topics[:3], 1):
+                comment = " _(Diamond hands! 💎)_" if 'crypto' in topic.lower() else ""
+                report += f"\n\n• **{topic}:** {count} mentions{comment}"
+        
+        if other_topics:
+            report += f"\n\n#### 🏠 Daily Life Topics"
+            for i, (topic, count) in enumerate(other_topics[:3], 1):
+                report += f"\n\n• **{topic}:** {count} mentions"
+    
+    # Add drama analysis if available
+    if drama_text:
+        report += f"\n{drama_text}"
+    
+    report += f"\n\n### 📈 GROUP BEHAVIORAL INSIGHTS\n#### ⏰ Time Patterns\n\n• {time_behavior}\n\n• **Most active day:** {peak_day} ({daily.max()} messages)\n\n• **Quietest day:** {daily.idxmin()} ({daily.min()} messages)\n\n#### 💬 Communication Style"
+    
+    if emoji_users:
+        report += f"\n\n• **Emoji Usage Leader:** **{max(emoji_users, key=emoji_users.get)}** _(The Visual Communicator)_"
+    if question_users:
+        report += f"\n\n• **Most Questions Asked:** **{max(question_users, key=question_users.get)}** _(The Curious One)_"
+    if exclamation_users:
+        report += f"\n\n• **Most Exclamation Points:** **{max(exclamation_users, key=exclamation_users.get)}** _(The Hype Person!)_"
+
     # Group personality summary
-    if 'trump' in [t[0] for t in sorted_topics[:3]] or 'modi' in [t[0] for t in sorted_topics[:3]]:
-        personality = "🗳️ Political Debate Warriors"
-    elif 'stock' in [t[0] for t in sorted_topics[:3]] or 'crypto' in [t[0] for t in sorted_topics[:3]]:
-        personality = "💰 Finance Bros United"
-    elif 'movie' in [t[0] for t in sorted_topics[:3]] or 'cricket' in [t[0] for t in sorted_topics[:3]]:
-        personality = "🍿 Entertainment Addicts"
+    if sorted_topics:
+        top_topic_names = [topic.lower() for topic, _ in sorted_topics[:3]]
+        if any(word in top_topic_names for word in ['trump', 'modi', 'election', 'politics', 'bjp', 'congress']):
+            personality = "🗳️ Political Debate Society"
+        elif any(word in top_topic_names for word in ['stock', 'crypto', 'bitcoin', 'investment', 'market', 'gold']):
+            personality = "📈 Investment Club"
+        elif any(word in top_topic_names for word in ['movie', 'bollywood', 'cricket', 'ipl', 'kohli']):
+            personality = "🎬 Entertainment Enthusiasts"
+        else:
+            personality = "🤝 Balanced Social Circle"
     else:
-        personality = "🌟 Perfectly Balanced Squad"
-    
-    report += f"""
+        personality = "🤝 Balanced Social Circle"
 
-💥 VERDICT: {personality}
-Your group isn't just another chat - you're a full-blown COMMUNITY with serious personality! 🔥
-
----
-🤯 Want to expose YOUR group's secrets?
-
-Get your mind-blowing analysis FREE:
-👉 https://whatsapp-group-analyzer.streamlit.app
-
-Your friends will LOSE THEIR MINDS over these results! 🤯✨"""
+    report += f"\n\n### 🎯 THE REAL GROUP PERSONALITY\n**{personality}**\n_You're not just another group chat - you're a community with strong opinions and great energy!_\n\n### 🚀 Want YOUR group analyzed?\nGet your mind-blowing analysis FREE:\n👉 https://whatsapp-group-analyzer.streamlit.app\n\n_Discover who's really running your group!_ 📊✨"
     
     return report
 
