@@ -677,7 +677,7 @@ def generate_share_report(analyzer):
         'modi', 'bjp', 'congress', 'aap', 'election', 'vote', 'parliament', 'politics', 'government', 
         'rahul gandhi', 'amit shah', 'kejriwal', 'mamata', 'yogi', 'state election', 'lok sabha', 'rajya sabha',
         'cm', 'pm', 'president', 'governor', 'minister', 'mla', 'mp', 'bjp congress', 'alliance', 'coalition',
-        'supreme court', 'high court', 'cbi', 'ed', 'income tax raid', 'corruption', 'scam',
+        'supreme court', 'high court', 'cbi', 'income tax raid', 'corruption', 'scam',
         
         # Finance & Economy (Extended)
         'stock', 'market', 'nifty', 'sensex', 'investment', 'mutual fund', 'sip', 'fd', 'ppf', 'nsc',
