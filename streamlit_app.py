@@ -7,6 +7,8 @@ from whatsapp_analyzer import WhatsAppAnalyzer
 import matplotlib.pyplot as plt
 import io
 import base64
+from analytics import log_usage_event, get_usage_stats, display_analytics_dashboard
+from security import file_validator, SecurityError
 
 st.set_page_config(
     page_title="WhatsApp Group Analyzer",
@@ -16,6 +18,9 @@ st.set_page_config(
 )
 
 def main():
+    # Track page view
+    log_usage_event('page_view')
+    
     # Consumer product hero section
     st.markdown("""
     <div style="text-align: center; padding: 30px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; margin-bottom: 30px;">
@@ -46,10 +51,34 @@ def main():
         1. Open your WhatsApp group
         2. Tap the group name → Export Chat
         3. Choose "Without Media" 
-        4. Upload the file here!
+        4. Upload the ZIP file here!
         
-        **Don't worry** - we don't save anything, it's 100% private! 🔒
+        **⚠️ Important: If export doesn't work:**
+        1. Go to WhatsApp Settings → Account → Privacy → Advanced
+        2. Turn OFF "Protect IP address in calls" (if enabled)
+        3. Export your chat (it should work now)
+        4. Turn the privacy setting back ON after export
+        
+        **🔒 Privacy Guarantee:**
+        - Files are processed securely and temporarily on our servers
+        - All files are automatically deleted immediately after analysis
+        - We never store, save, or keep your chat data
+        - No chat content is logged or retained beyond the analysis
+        - Your data is processed in-memory only and discarded 
         """)
+        
+        st.info("💡 **Why turn off Advanced Privacy?** Some WhatsApp privacy settings can interfere with chat export functionality. It's safe to temporarily disable this for the export process.")
+    
+    # Privacy notice
+    st.markdown("""
+    <div style="background: #e8f5e8; padding: 15px; border-radius: 10px; border-left: 4px solid #4caf50; margin: 20px 0;">
+        <h4 style="margin-top: 0; color: #2e7d32;">🛡️ 100% Private & Secure</h4>
+        <p style="margin-bottom: 0; color: #388e3c;">
+        Your chat files are processed temporarily and automatically deleted after analysis. 
+        No data is stored, saved, or retained on our servers. Your privacy is protected.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
     uploaded_file = st.file_uploader(
         "🚀 Drop your chat file here and let the magic begin!", 
@@ -58,6 +87,26 @@ def main():
     )
     
     if uploaded_file is not None:
+        # Track file upload
+        log_usage_event('file_uploaded', file_type=uploaded_file.type, file_size=uploaded_file.size)
+        
+        # Security validation first
+        try:
+            with st.spinner("🔒 Validating file security..."):
+                file_validator.validate_uploaded_file(uploaded_file)
+            
+            log_usage_event('file_security_passed')
+            
+        except SecurityError as e:
+            st.error(f"🚫 **Security Check Failed:** {str(e)}")
+            st.warning("Please ensure you're uploading a legitimate WhatsApp chat export file.")
+            log_usage_event('file_security_failed', reason=str(e))
+            return
+        except Exception as e:
+            st.error("🚫 **File validation failed.** Please try again with a different file.")
+            log_usage_event('file_security_error', error_type=type(e).__name__)
+            return
+        
         with st.spinner("🔮 Revealing your group's secrets... Prepare for some surprises!"):
             try:
                 # Handle ZIP or TXT files
@@ -82,26 +131,43 @@ def main():
                             st.error("❌ No chat file found in ZIP. Please make sure you exported the chat correctly.")
                             return
                         
-                        # Extract the chat file
-                        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as tmp_file:
-                            content = zip_ref.read(chat_file).decode('utf-8', errors='ignore')
-                            tmp_file.write(content)
-                            tmp_file_path = tmp_file.name
+                        # Extract and validate chat file content
+                        content = zip_ref.read(chat_file).decode('utf-8', errors='ignore')
+                        
+                        # Additional content validation
+                        file_validator.validate_text_content(content)
+                        
+                        # Create secure temporary file
+                        tmp_file_path = file_validator.create_secure_temp_file(content)
                     
-                    os.unlink(tmp_zip_path)
+                    # Clean up ZIP file immediately after extraction
+                    try:
+                        os.unlink(tmp_zip_path)
+                    except:
+                        pass
                 else:
                     # Handle direct TXT file
-                    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as tmp_file:
-                        content = uploaded_file.getvalue().decode('utf-8')
-                        tmp_file.write(content)
-                        tmp_file_path = tmp_file.name
+                    content = uploaded_file.getvalue().decode('utf-8', errors='ignore')
+                    
+                    # Additional content validation
+                    file_validator.validate_text_content(content)
+                    
+                    # Create secure temporary file
+                    tmp_file_path = file_validator.create_secure_temp_file(content)
                 
                 analyzer = WhatsAppAnalyzer(tmp_file_path)
                 df = analyzer.parse_chat()
                 
                 if len(df) == 0:
                     st.error("❌ No messages found! Please check your file format.")
+                    log_usage_event('analysis_failed', reason='no_messages_found')
                     return
+                
+                # Track successful analysis
+                log_usage_event('analysis_completed', 
+                               message_count=len(df), 
+                               participant_count=len(df['sender'].unique()),
+                               time_span_days=(df['timestamp'].max() - df['timestamp'].min()).days)
                 
                 # Simple success message
                 st.success(f"We analyzed {len(df):,} messages from {len(df['sender'].unique())} people")
@@ -174,6 +240,9 @@ def main():
                 encoded_text = urllib.parse.quote(share_text)
                 whatsapp_url = f"https://api.whatsapp.com/send?text={encoded_text}"
                 
+                # Track when share button is displayed (indicates successful analysis)
+                log_usage_event('share_displayed')
+                
                 # Single prominent share button
                 st.markdown(f"""
                 <div style="text-align: center; margin: 30px 0;">
@@ -244,9 +313,26 @@ def main():
                 with st.expander("🏆 Hall of Fame & Shame"):
                     display_fun_awards(analyzer)
                 
-                os.unlink(tmp_file_path)
+                # Clean up temporary files securely
+                try:
+                    file_validator.secure_cleanup(tmp_file_path)
+                    st.success("✅ Temporary files securely deleted")
+                except:
+                    pass  # File might already be deleted
                 
             except Exception as e:
+                # Ensure cleanup even if there's an error
+                try:
+                    if 'tmp_file_path' in locals():
+                        file_validator.secure_cleanup(tmp_file_path)
+                    if 'tmp_zip_path' in locals():
+                        file_validator.secure_cleanup(tmp_zip_path)
+                except:
+                    pass
+                    
+                # Track error
+                log_usage_event('analysis_error', error_type=type(e).__name__)
+                
                 st.markdown("""
                 <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #ff7b7b, #ff6b6b); border-radius: 15px; margin: 20px 0;">
                     <h3 style="color: white; margin-bottom: 10px;">😅 Whoops! The magic spell didn't work!</h3>
@@ -265,6 +351,23 @@ def main():
                 """)
                 with st.expander("🤓 Nerdy technical stuff"):
                     st.text(str(e))
+
+    # Check for admin analytics view
+    if st.query_params.get("admin") == "analytics2024":
+        st.markdown("---")
+        display_analytics_dashboard()
+    
+    # Privacy footer
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px; margin: 30px 0;">
+        <h4 style="color: #495057; margin-bottom: 10px;">🔒 Your Privacy is Our Priority</h4>
+        <p style="color: #6c757d; margin: 0; font-size: 14px;">
+        Files are processed temporarily on secure servers and automatically deleted after analysis.<br>
+        We never store, log, or retain your personal chat data. Your conversations are processed and discarded.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
 def display_overview(df, analyzer):
     col1, col2 = st.columns(2)

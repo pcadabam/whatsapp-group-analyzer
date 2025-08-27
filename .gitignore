@@ -169,3 +169,9 @@ test_*.py
 *.png
 *.jpg
 *.jpeg
+
+# Analytics (keep local only)
+usage_analytics.json
+
+# Security temporary files
+whatsapp_secure_*
