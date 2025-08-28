@@ -184,8 +184,16 @@ class WhatsAppAnalyzer:
         
         print("\n🗣️ MOST TALKED ABOUT:")
         topic_counts = {}
+        import re
         for topic in common_topics:
-            count = sum(1 for msg in messages if topic.lower() in msg.lower())
+            # Use word boundary matching for short topics to avoid false positives
+            if len(topic) <= 3 and ' ' not in topic:
+                # For short single words, use word boundaries
+                pattern = r'\b' + re.escape(topic.lower()) + r'\b'
+                count = sum(1 for msg in messages if re.search(pattern, msg.lower()))
+            else:
+                # For longer words and phrases, use substring matching
+                count = sum(1 for msg in messages if topic.lower() in msg.lower())
             if count > 0:
                 topic_counts[topic] = count
         
@@ -281,13 +289,42 @@ class WhatsAppAnalyzer:
         question_users = defaultdict(int)
         exclamation_users = defaultdict(int)
         media_users = defaultdict(int)
+        laugh_track = defaultdict(int)
+        one_word_messages = defaultdict(int)
+        late_night_messages = defaultdict(int)
+        typo_messages = defaultdict(int)
+        voice_notes = defaultdict(int)
         
         for _, row in self.df.iterrows():
             sender = row['sender']
             msg = row['message']
+            hour = row['hour']
             
             emoji_count = len(re.findall(r'[😀-🙏🌀-🗿🚀-🛿🏴-🏿]', msg))
             emoji_users[sender] += emoji_count
+            
+            # Laugh track - count various forms of laughter
+            laugh_patterns = ['haha', 'hehe', 'lol', 'rofl', 'lmao', '😂', '🤣', '😄', '😆']
+            for pattern in laugh_patterns:
+                if pattern in msg.lower():
+                    laugh_track[sender] += 1
+                    break
+            
+            # One word wonder - messages with single word (excluding media)
+            if not msg.startswith('<Media omitted>') and len(msg.split()) == 1 and len(msg) < 20:
+                one_word_messages[sender] += 1
+            
+            # Late night texter (2 AM - 5 AM)
+            if 2 <= hour < 5:
+                late_night_messages[sender] += 1
+            
+            # Voice notes (look for audio omitted)
+            if 'audio omitted' in msg.lower():
+                voice_notes[sender] += 1
+            
+            # Basic typo detection (messages with multiple consecutive same letters)
+            if re.search(r'(.)\1{2,}', msg) or re.search(r'[a-zA-Z]{15,}', msg):
+                typo_messages[sender] += 1
             
             if '?' in msg:
                 question_users[sender] += 1
@@ -302,15 +339,135 @@ class WhatsAppAnalyzer:
         if media_users:
             print(f"📸 Media Mogul: {max(media_users, key=media_users.get)}")
         
+        if laugh_track:
+            print(f"🤣 Laugh Factory: {max(laugh_track, key=laugh_track.get)} (made people laugh most)")
+        
+        if one_word_messages:
+            print(f"🔤 One Word Wonder: {max(one_word_messages, key=one_word_messages.get)}")
+        
+        if late_night_messages:
+            print(f"🦉 Night Owl Champion: {max(late_night_messages, key=late_night_messages.get)}")
+        
+        if voice_notes:
+            print(f"🎤 Voice Note Addict: {max(voice_notes, key=voice_notes.get)}")
+        
         avg_msg_length = self.df.groupby('sender')['message'].apply(lambda x: x.str.len().mean())
         print(f"📜 Essay Writer: {avg_msg_length.idxmax()} ({avg_msg_length.max():.0f} chars avg)")
         print(f"🔤 Short & Sweet: {avg_msg_length.idxmin()} ({avg_msg_length.min():.0f} chars avg)")
         
         return {
-            'emoji_champion': max(emoji_users, key=emoji_users.get),
-            'question_master': max(question_users, key=question_users.get),
-            'excitement_person': max(exclamation_users, key=exclamation_users.get)
+            'emoji_champion': max(emoji_users, key=emoji_users.get) if emoji_users else None,
+            'question_master': max(question_users, key=question_users.get) if question_users else None,
+            'excitement_person': max(exclamation_users, key=exclamation_users.get) if exclamation_users else None,
+            'laugh_factory': max(laugh_track, key=laugh_track.get) if laugh_track else None,
+            'one_word_wonder': max(one_word_messages, key=one_word_messages.get) if one_word_messages else None,
+            'night_owl': max(late_night_messages, key=late_night_messages.get) if late_night_messages else None
         }
+    
+    def generate_most_likely_awards(self):
+        """Generate 'Most Likely To...' awards"""
+        print("\n🎭 MOST LIKELY TO...")
+        print("=" * 50)
+        
+        # Calculate various metrics for each user
+        user_stats = {}
+        for sender in self.df['sender'].unique():
+            sender_msgs = self.df[self.df['sender'] == sender]
+            user_stats[sender] = {
+                'total_messages': len(sender_msgs),
+                'avg_hour': sender_msgs['hour'].mean(),
+                'weekend_ratio': len(sender_msgs[sender_msgs['day_of_week'].isin(['Saturday', 'Sunday'])]) / max(len(sender_msgs), 1),
+                'night_messages': len(sender_msgs[(sender_msgs['hour'] >= 0) & (sender_msgs['hour'] < 5)]),
+                'consecutive_messages': self.count_consecutive_messages(sender),
+                'media_count': len(sender_msgs[sender_msgs['message'].str.contains('Media omitted')]),
+                'question_ratio': len(sender_msgs[sender_msgs['message'].str.contains('?')]) / max(len(sender_msgs), 1),
+                'link_count': len(sender_msgs[sender_msgs['message'].str.contains('http|www', case=False, regex=True)])
+            }
+        
+        # Award assignments
+        awards = []
+        
+        # Most likely to reply at 3 AM
+        night_owl = max(user_stats.items(), key=lambda x: x[1]['night_messages'])
+        if night_owl[1]['night_messages'] > 0:
+            awards.append(f"🌙 Reply at 3 AM: {night_owl[0]} ({night_owl[1]['night_messages']} night messages)")
+        
+        # Most likely to send 20 messages in a row
+        spam_king = max(user_stats.items(), key=lambda x: x[1]['consecutive_messages'])
+        if spam_king[1]['consecutive_messages'] > 3:
+            awards.append(f"📱 Send 20 messages in a row: {spam_king[0]} (max streak: {spam_king[1]['consecutive_messages']})")
+        
+        # Most likely to share links/news
+        if any(stats['link_count'] > 0 for stats in user_stats.values()):
+            news_sharer = max(user_stats.items(), key=lambda x: x[1]['link_count'])
+            awards.append(f"📰 Share breaking news: {news_sharer[0]} ({news_sharer[1]['link_count']} links shared)")
+        
+        # Most likely to ask questions
+        curious_cat = max(user_stats.items(), key=lambda x: x[1]['question_ratio'])
+        if curious_cat[1]['question_ratio'] > 0.1:
+            awards.append(f"❓ Ask 'but why?': {curious_cat[0]} ({curious_cat[1]['question_ratio']*100:.0f}% questions)")
+        
+        # Most likely to ghost the group (lurker)
+        total_messages = len(self.df)
+        lurkers = [(name, stats['total_messages']) for name, stats in user_stats.items() 
+                   if stats['total_messages'] < total_messages * 0.02]
+        if lurkers:
+            biggest_lurker = min(lurkers, key=lambda x: x[1])
+            awards.append(f"👻 Ghost the group: {biggest_lurker[0]} (only {biggest_lurker[1]} messages)")
+        
+        for award in awards:
+            print(f"   • {award}")
+        
+        return awards
+    
+    def count_consecutive_messages(self, sender):
+        """Count maximum consecutive messages by a sender"""
+        max_consecutive = 0
+        current_consecutive = 0
+        
+        for _, row in self.df.iterrows():
+            if row['sender'] == sender:
+                current_consecutive += 1
+                max_consecutive = max(max_consecutive, current_consecutive)
+            else:
+                current_consecutive = 0
+        
+        return max_consecutive
+    
+    def detect_lurkers(self):
+        """Detect lurkers in the group"""
+        print("\n👀 LURKER ANALYSIS")
+        print("=" * 50)
+        
+        total_messages = len(self.df)
+        total_days = (self.df['timestamp'].max() - self.df['timestamp'].min()).days
+        
+        lurker_scores = []
+        for sender in self.df['sender'].unique():
+            sender_msgs = self.df[self.df['sender'] == sender]
+            message_count = len(sender_msgs)
+            participation_rate = message_count / total_messages
+            
+            if participation_rate < 0.05:  # Less than 5% of total messages
+                msgs_per_day = message_count / max(total_days, 1)
+                lurker_scores.append({
+                    'name': sender,
+                    'messages': message_count,
+                    'percentage': participation_rate * 100,
+                    'msgs_per_day': msgs_per_day
+                })
+        
+        if lurker_scores:
+            lurker_scores.sort(key=lambda x: x['messages'])
+            print("🤫 Silent watchers:")
+            for lurker in lurker_scores[:3]:
+                print(f"   • {lurker['name']}: {lurker['messages']} messages ({lurker['percentage']:.1f}% participation)")
+                if lurker['msgs_per_day'] < 0.1:
+                    print(f"     → Appears once every {1/max(lurker['msgs_per_day'], 0.001):.0f} days")
+        else:
+            print("   Everyone actively participates! No lurkers detected.")
+        
+        return lurker_scores
     
     def create_visualizations(self):
         """Create fun visualizations"""
@@ -396,6 +553,10 @@ def main():
     starters = analyzer.find_conversation_starters()
     
     awards = analyzer.generate_fun_awards()
+    
+    most_likely = analyzer.generate_most_likely_awards()
+    
+    lurkers = analyzer.detect_lurkers()
     
     fig = analyzer.create_visualizations()
     

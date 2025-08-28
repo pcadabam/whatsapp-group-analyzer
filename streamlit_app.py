@@ -58,9 +58,14 @@ def main():
         
  
         """)
-        
     
-    # Privacy notice
+    # File uploader - moved up
+    uploaded_file = st.file_uploader(
+        "Upload here", 
+        type=['zip', 'txt']
+    )
+    
+    # Privacy notice - moved down
     st.markdown("""
     <div style="background: #e8f5e8; padding: 15px; border-radius: 10px; border-left: 4px solid #4caf50; margin: 20px 0;">
         <h4 style="margin-top: 0; color: #2e7d32;">🛡️ 100% Private & Secure</h4>
@@ -70,11 +75,6 @@ def main():
         </p>
     </div>
     """, unsafe_allow_html=True)
-    
-    uploaded_file = st.file_uploader(
-        "Upload here", 
-        type=['zip', 'txt']
-    )
     
     if uploaded_file is not None:
         # Track file upload
@@ -461,7 +461,7 @@ def display_hot_topics(analyzer):
         # Cities & States
         'bangalore', 'bengaluru', 'mumbai', 'delhi', 'chennai', 'hyderabad', 'pune', 'kolkata',
         'gurgaon', 'noida', 'karnataka', 'maharashtra', 'tamil nadu', 'kerala', 'gujarat', 'rajasthan',
-        'up', 'bihar', 'west bengal', 'telangana', 'andhra pradesh',
+        'uttar pradesh', 'bihar', 'west bengal', 'telangana', 'andhra pradesh',
         
         # Technology & Work
         'work', 'job', 'salary', 'appraisal', 'promotion', 'interview', 'tech', 'software', 'ai',
@@ -506,8 +506,16 @@ def display_hot_topics(analyzer):
     ]
     
     topic_counts = {}
+    import re
     for topic in common_topics:
-        count = sum(1 for msg in messages if topic.lower() in msg.lower())
+        # Use word boundary matching for short topics to avoid false positives
+        if len(topic) <= 3 and ' ' not in topic:
+            # For short single words, use word boundaries
+            pattern = r'\b' + re.escape(topic.lower()) + r'\b'
+            count = sum(1 for msg in messages if re.search(pattern, msg.lower()))
+        else:
+            # For longer words and phrases, use substring matching
+            count = sum(1 for msg in messages if topic.lower() in msg.lower())
         if count > 0:
             topic_counts[topic.capitalize()] = count
     
@@ -638,6 +646,125 @@ def display_fun_awards(analyzer):
     for i, (sender, count) in enumerate(starter_counts.most_common(5)):
         st.write(f"{i+1}. **{sender}**: started {count} conversations")
 
+def add_quick_win_features(df):
+    """Add the fun quick-win features to the report"""
+    import re
+    from collections import defaultdict
+    
+    # Initialize counters for all our fun features
+    laugh_track = defaultdict(int)
+    one_word_messages = defaultdict(int)
+    late_night_messages = defaultdict(int)
+    voice_notes = defaultdict(int)
+    consecutive_messages = defaultdict(int)
+    link_sharers = defaultdict(int)
+    
+    # Calculate consecutive messages
+    def count_consecutive_for_sender(sender):
+        max_consecutive = 0
+        current_consecutive = 0
+        
+        for _, row in df.iterrows():
+            if row['sender'] == sender:
+                current_consecutive += 1
+                max_consecutive = max(max_consecutive, current_consecutive)
+            else:
+                current_consecutive = 0
+        return max_consecutive
+    
+    # Analyze each message
+    for _, row in df.iterrows():
+        sender = row['sender']
+        msg = row['message']
+        hour = row['hour']
+        
+        # Laugh track - count various forms of laughter
+        laugh_patterns = ['haha', 'hehe', 'lol', 'rofl', 'lmao', '😂', '🤣', '😄', '😆', 'hahaha']
+        for pattern in laugh_patterns:
+            if pattern in msg.lower():
+                laugh_track[sender] += 1
+                break
+        
+        # One word wonder - messages with single word (excluding media)
+        if not msg.startswith('<Media omitted>') and len(msg.split()) == 1 and len(msg.strip()) < 20:
+            one_word_messages[sender] += 1
+        
+        # Late night texter (2 AM - 5 AM)
+        if 2 <= hour < 5:
+            late_night_messages[sender] += 1
+        
+        # Voice notes
+        if 'audio omitted' in msg.lower():
+            voice_notes[sender] += 1
+        
+        # Link sharers
+        if 'http' in msg.lower() or 'www.' in msg.lower():
+            link_sharers[sender] += 1
+    
+    # Calculate consecutive messages for each sender
+    for sender in df['sender'].unique():
+        consecutive_messages[sender] = count_consecutive_for_sender(sender)
+    
+    # Generate report text
+    report_text = ""
+    
+    # Add fun awards section
+    report_text += f"\n\n--------------------\n\n🎭 *EXTRA FUN AWARDS*"
+    
+    if laugh_track:
+        top_comedian = max(laugh_track, key=laugh_track.get)
+        report_text += f"\n\n• 🤣 *Laugh Factory:* *{top_comedian}* (made people laugh {laugh_track[top_comedian]} times)"
+    
+    if one_word_messages:
+        one_word_king = max(one_word_messages, key=one_word_messages.get)
+        if one_word_messages[one_word_king] > 5:  # Only show if significant
+            report_text += f"\n\n• 🔤 *One Word Wonder:* *{one_word_king}* ({one_word_messages[one_word_king]} single-word replies)"
+    
+    if late_night_messages:
+        night_owl = max(late_night_messages, key=late_night_messages.get)
+        if late_night_messages[night_owl] > 3:
+            report_text += f"\n\n• 🦉 *2 AM Texter:* *{night_owl}* ({late_night_messages[night_owl]} messages at 2-5 AM)"
+    
+    if voice_notes:
+        voice_addict = max(voice_notes, key=voice_notes.get)
+        report_text += f"\n\n• 🎤 *Voice Note Addict:* *{voice_addict}* ({voice_notes[voice_addict]} voice messages)"
+    
+    if link_sharers:
+        news_person = max(link_sharers, key=link_sharers.get)
+        if link_sharers[news_person] > 2:
+            report_text += f"\n\n• 📰 *Link Master:* *{news_person}* ({link_sharers[news_person]} links shared)"
+    
+    # Most Likely To... section
+    report_text += f"\n\n--------------------\n\n🎯 *MOST LIKELY TO...*"
+    
+    # Most likely to send multiple messages in a row
+    if consecutive_messages:
+        spam_king = max(consecutive_messages, key=consecutive_messages.get)
+        if consecutive_messages[spam_king] > 5:
+            report_text += f"\n\n• 📱 *Send 20 messages in a row:* *{spam_king}* (max streak: {consecutive_messages[spam_king]})"
+    
+    # Most likely to reply at 3 AM
+    if late_night_messages:
+        night_replier = max(late_night_messages, key=late_night_messages.get)
+        if late_night_messages[night_replier] > 0:
+            report_text += f"\n\n• 🌙 *Reply at 3 AM:* *{night_replier}* ({late_night_messages[night_replier]} late night messages)"
+    
+    # Lurker detection
+    total_messages = len(df)
+    lurkers = []
+    for sender in df['sender'].unique():
+        sender_msg_count = len(df[df['sender'] == sender])
+        participation_rate = sender_msg_count / total_messages
+        if participation_rate < 0.02 and sender_msg_count < 10:  # Less than 2% participation
+            lurkers.append((sender, sender_msg_count, participation_rate * 100))
+    
+    if lurkers:
+        lurkers.sort(key=lambda x: x[1])  # Sort by message count
+        biggest_lurker = lurkers[0]
+        report_text += f"\n\n• 👻 *Ghost the group:* *{biggest_lurker[0]}* (only {biggest_lurker[1]} messages - {biggest_lurker[2]:.1f}% participation)"
+    
+    return report_text
+
 def generate_share_report(analyzer):
     """Generate a shareable text report"""
     df = analyzer.df
@@ -703,7 +830,7 @@ def generate_share_report(analyzer):
         # Cities & States (Extended)
         'bangalore', 'bengaluru', 'mumbai', 'delhi', 'chennai', 'hyderabad', 'pune', 'kolkata',
         'gurgaon', 'noida', 'karnataka', 'maharashtra', 'tamil nadu', 'kerala', 'gujarat', 'rajasthan',
-        'up', 'bihar', 'west bengal', 'telangana', 'andhra pradesh', 'odisha', 'assam', 'punjab',
+        'uttar pradesh', 'bihar', 'west bengal', 'telangana', 'andhra pradesh', 'odisha', 'assam', 'punjab',
         'haryana', 'madhya pradesh', 'uttarakhand', 'himachal pradesh', 'goa', 'jharkhand', 'chhattisgarh',
         'jammu kashmir', 'ladakh', 'delhi ncr', 'tier 2 city', 'metro city',
         
@@ -718,7 +845,7 @@ def generate_share_report(analyzer):
         # Entertainment & Sports (Extended)
         'movie', 'bollywood', 'hollywood', 'netflix', 'amazon prime', 'hotstar', 'film', 'actor',
         'cricket', 'ipl', 'world cup', 'kohli', 'dhoni', 'rohit', 'football', 'fifa', 'olympics',
-        'tennis', 'badminton', 'kabaddi', 'hockey', 'sports', 'rcb', 'csk', 'mi', 'kkr',
+        'tennis', 'badminton', 'kabaddi', 'hockey', 'sports', 'rcb', 'csk', 'mumbai indians', 'kkr',
         'youtube', 'instagram', 'facebook', 'twitter', 'snapchat', 'tiktok', 'reel', 'story',
         'series', 'web series', 'ott', 'trailer', 'box office', 'oscar', 'national award',
         'south movie', 'dubbed', 'subtitles', 'theater', 'multiplex', 'pvr', 'inox',
@@ -810,8 +937,16 @@ def generate_share_report(analyzer):
     ]
     
     topic_counts = {}
+    import re
     for topic in common_topics:
-        count = sum(1 for msg in messages if topic.lower() in msg.lower())
+        # Use word boundary matching for short topics to avoid false positives
+        if len(topic) <= 3 and ' ' not in topic:
+            # For short single words, use word boundaries
+            pattern = r'\b' + re.escape(topic.lower()) + r'\b'
+            count = sum(1 for msg in messages if re.search(pattern, msg.lower()))
+        else:
+            # For longer words and phrases, use substring matching
+            count = sum(1 for msg in messages if topic.lower() in msg.lower())
         if count > 0:
             topic_counts[topic.capitalize()] = count
     
@@ -903,12 +1038,16 @@ Based on *{len(df):,} messages* from *{len(df['sender'].unique())} participants*
 
 --------------------
 
+--------------------
+
 📊 *GROUP DYNAMICS AT A GLANCE*
 • *Daily average:* {msgs_per_day:.1f} messages ({activity_desc.replace('🔥', '').replace('💬', '').replace('😌', '').strip()})
 
 • *Peak activity:* {peak_hour}:00 on {peak_day}s ({time_behavior.replace('🌅', '').replace('🦉', '').replace('📱', '').strip()})
 
 • *Most active day:* {peak_day} ({daily.max()} messages)
+
+--------------------
 
 🏆 *THE HALL OF FAME*
 🗣️ *Top 5 Chatters*"""
@@ -933,7 +1072,7 @@ Based on *{len(df):,} messages* from *{len(df['sender'].unique())} participants*
         quiet_names = ", ".join([row['name'] for _, row in quiet_members.iterrows()])
         report += f"\n\n🤐 *The Silent Observers*\n\n• {quiet_names} - 1 message each _(Lurkers!)_"
     
-    report += f"\n\n🎭 *PERSONALITY AWARDS*\n😄 *Mood Meters*"
+    report += f"\n\n--------------------\n\n🎭 *PERSONALITY AWARDS*\n😄 *Mood Meters*"
     
     if sentiments:
         report += f"\n\n• *Most Positive Vibes:* "
@@ -959,7 +1098,7 @@ Based on *{len(df):,} messages* from *{len(df['sender'].unique())} participants*
     if question_users:
         report += f"\n\n• ❓ *Question Master:* *{max(question_users, key=question_users.get)}*"
     
-    report += f"\n\n🔥 *WHAT YOU ACTUALLY TALK ABOUT*"
+    report += f"\n\n--------------------\n\n🔥 *WHAT YOU ACTUALLY TALK ABOUT*"
     
     if sorted_topics:
         # Categorize topics
@@ -997,7 +1136,7 @@ Based on *{len(df):,} messages* from *{len(df['sender'].unique())} participants*
     if drama_text:
         report += f"\n{drama_text}"
     
-    report += f"\n\n📈 *GROUP BEHAVIORAL INSIGHTS*\n⏰ *Time Patterns*\n\n• {time_behavior}\n\n• *Most active day:* {peak_day} ({daily.max()} messages)\n\n• *Quietest day:* {daily.idxmin()} ({daily.min()} messages)\n\n💬 *Communication Style*"
+    report += f"\n\n--------------------\n\n📈 *GROUP BEHAVIORAL INSIGHTS*\n⏰ *Time Patterns*\n\n• {time_behavior}\n\n• *Most active day:* {peak_day} ({daily.max()} messages)\n\n• *Quietest day:* {daily.idxmin()} ({daily.min()} messages)\n\n💬 *Communication Style*"
     
     if emoji_users:
         report += f"\n\n• *Emoji Usage Leader:* *{max(emoji_users, key=emoji_users.get)}* _(The Visual Communicator)_"
@@ -1005,6 +1144,9 @@ Based on *{len(df):,} messages* from *{len(df['sender'].unique())} participants*
         report += f"\n\n• *Most Questions Asked:* *{max(question_users, key=question_users.get)}* _(The Curious One)_"
     if exclamation_users:
         report += f"\n\n• *Most Exclamation Points:* *{max(exclamation_users, key=exclamation_users.get)}* _(The Hype Person!)_"
+    
+    # Add our new fun features
+    report += add_quick_win_features(df)
 
     # Group personality summary
     if sorted_topics:
