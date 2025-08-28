@@ -9,6 +9,10 @@ import io
 import base64
 from analytics import log_usage_event, get_usage_stats, display_analytics_dashboard
 from security import file_validator, SecurityError
+import uuid
+import json
+from datetime import datetime
+import pickle
 
 st.set_page_config(
     page_title="WhatsApp Group Analyzer - Discover Your Group's Personality",
@@ -35,7 +39,252 @@ st.markdown("""
 <meta name="description" content="Free WhatsApp group chat analyzer. Discover who's most active, sentiment analysis, hot topics, personality awards and more!">
 """, unsafe_allow_html=True)
 
+def save_analysis_report(analyzer, share_text):
+    """Save complete analysis data for sharing"""
+    try:
+        # Generate unique ID
+        report_id = str(uuid.uuid4())[:8]
+        
+        # Create reports directory
+        os.makedirs('reports', exist_ok=True)
+        
+        # Prepare complete analysis data
+        report_data = {
+            'id': report_id,
+            'created_at': datetime.now().isoformat(),
+            'share_text': share_text,
+            'df_json': analyzer.df.to_json(),  # Store DataFrame as JSON
+            'metadata': {
+                'message_count': len(analyzer.df),
+                'participant_count': len(analyzer.df['sender'].unique()),
+                'time_span_days': (analyzer.df['timestamp'].max() - analyzer.df['timestamp'].min()).days,
+                'date_range': f"{analyzer.df['timestamp'].min().date()} to {analyzer.df['timestamp'].max().date()}"
+            }
+        }
+        
+        # Save to file
+        with open(f'reports/{report_id}.json', 'w') as f:
+            json.dump(report_data, f)
+        
+        return report_id
+        
+    except Exception as e:
+        st.error(f"Error saving report: {e}")
+        return None
+
+def load_shared_report(report_id):
+    """Load shared report data"""
+    try:
+        with open(f'reports/{report_id}.json', 'r') as f:
+            report_data = json.load(f)
+        
+        # Reconstruct DataFrame from JSON
+        df = pd.read_json(report_data['df_json'])
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df['date'] = df['timestamp'].dt.date
+        
+        # Create a minimal analyzer object with the loaded data
+        class SharedAnalyzer:
+            def __init__(self, df):
+                self.df = df
+                self.messages = df.to_dict('records')
+        
+        analyzer = SharedAnalyzer(df)
+        
+        return {
+            'analyzer': analyzer,
+            'share_text': report_data['share_text'],
+            'metadata': report_data['metadata'],
+            'created_at': report_data['created_at']
+        }
+        
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        st.error(f"Error loading report: {e}")
+        return None
+
+def display_share_interface(report_id):
+    """Display sharing interface with copy link"""
+    if report_id:
+        base_url = "https://whatsapp-group-analyzer.streamlit.app"  # Update with your actual URL
+        shareable_url = f"{base_url}/?report={report_id}"
+        
+        
+        
+        return shareable_url
+    return None
+
+def display_analysis_view(analyzer, share_text, report_id=None):
+    """Display the complete analysis experience - used for both original and shared reports"""
+    df = analyzer.df
+    
+    # Display the formatted shareable report
+    import re
+    
+    # Convert WhatsApp formatting to HTML
+    def whatsapp_to_html(text):
+        """Convert WhatsApp formatting (*bold* _italic_ ~strikethrough~) to HTML"""
+        # First clean up excessive newlines
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        
+        # Escape HTML special characters
+        text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        
+        # Convert WhatsApp formatting to HTML
+        text = re.sub(r'\*_([^_\n]+)_\*', r'<strong><em>\1</em></strong>', text)
+        text = re.sub(r'_\*([^*\n]+)\*_', r'<em><strong>\1</strong></em>', text)
+        text = re.sub(r'\*([^*\n]+)\*', r'<strong>\1</strong>', text)
+        text = re.sub(r'_([^_\n]+)_', r'<em>\1</em>', text)
+        text = re.sub(r'~([^~\n]+)~', r'<s>\1</s>', text)
+        text = re.sub(r'```([^`\n]+)```', r'<code>\1</code>', text)
+        
+        # Convert newlines to proper HTML: single newlines to <br>, double newlines to paragraph breaks
+        # Split into paragraphs first
+        paragraphs = text.split('\n\n')
+        html_paragraphs = []
+        
+        for para in paragraphs:
+            if para.strip():
+                # Within each paragraph, convert single newlines to <br>
+                para_html = para.replace('\n', '<br>')
+                html_paragraphs.append(f'<p>{para_html}</p>')
+        
+        return '<div>' + ''.join(html_paragraphs) + '</div>'
+    
+    html_text = whatsapp_to_html(share_text)
+    
+    # Metrics section (moved to top)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("💬 Total Messages", f"{len(df):,}")
+        st.metric("👥 People in Group", len(df['sender'].unique()))
+    with col2:
+        total_days = (df['timestamp'].max() - df['timestamp'].min()).days
+        msgs_per_day = len(df) / max(total_days, 1)
+        st.metric("📅 Days of Chat", total_days)
+        st.metric("🔥 Messages per Day", f"{msgs_per_day:.1f}")
+    
+    st.markdown("---")
+    
+    # Display formatted report
+    st.markdown(f"""
+    <div style="background: white; color: #333; border-radius: 20px; padding: 25px; margin: 20px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #e0e0e0; font-family: 'SF Pro Display', -apple-system, system-ui, sans-serif; line-height: 1.6; max-width: 100%; overflow-x: auto;">
+        {html_text}
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # WhatsApp share buttons - both mobile and web
+    import urllib.parse
+    encoded_text = urllib.parse.quote(share_text[:2000])  # WhatsApp has character limits
+    
+    st.markdown(f"""
+    <div style="text-align: center; margin: 20px 0;">
+        <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+            <a href="whatsapp://send?text={encoded_text}" 
+               style="display: inline-block; background: linear-gradient(45deg, #25D366, #128C7E); color: white; 
+               padding: 15px 25px; border-radius: 25px; text-decoration: none; font-weight: bold; 
+               box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3); margin: 5px;">
+                📱 Open WhatsApp App
+            </a>
+            <a href="https://web.whatsapp.com/send?text={encoded_text}" target="_blank"
+               style="display: inline-block; background: linear-gradient(45deg, #128C7E, #25D366); color: white; 
+               padding: 15px 25px; border-radius: 25px; text-decoration: none; font-weight: bold; 
+               box-shadow: 0 4px 15px rgba(18, 140, 126, 0.3); margin: 5px;">
+                💻 WhatsApp Web
+            </a>
+        </div>
+    </div>
+    <div style="text-align: center; color: #666; font-size: 16px; margin-bottom: 20px;">
+        Choose your preferred WhatsApp method! 👆
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Share This Analysis section (if report_id is available)
+    if report_id:
+        st.markdown("---")
+        st.markdown("### 🚀 Share This Analysis")
+        
+        base_url = "https://whatsapp-group-analyzer.streamlit.app"  # Update with your actual URL
+        shareable_url = f"{base_url}/?report={report_id}"
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.code(shareable_url, language=None)
+        with col2:
+            if st.button("📋 Copy Link", key="copy_link_main"):
+                st.success("✅ Link copied!")
+    
+    # Interactive sections
+    st.markdown("""
+    <div style="text-align: center; margin: 30px 0; padding: 20px; background: linear-gradient(45deg, #667eea, #764ba2); border-radius: 15px;">
+        <h2 style="color: white; margin: 0;">🕵️ Dive Deeper Into The Drama</h2>
+        <p style="color: white; opacity: 0.9; margin-top: 10px;">Click each section to uncover more juicy secrets!</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("📈 Your Group's Chatting Patterns", expanded=True):
+        display_overview(df, analyzer)
+    with st.expander("👑 The Conversation Rulers"):
+        display_top_chatters(analyzer)
+    with st.expander("😇 Angels vs Devils in Your Group"):
+        display_sentiment(analyzer)
+    with st.expander("🔥 Your Group's Obsessions Exposed"):
+        display_hot_topics(analyzer)
+    with st.expander("💥 Topics That Cause Group Wars"):
+        display_polarizing_topics(analyzer)
+    with st.expander("🕐 When Your Group Comes Alive"):
+        display_time_patterns(analyzer)
+    with st.expander("🏆 Hall of Fame & Shame"):
+        display_fun_awards(analyzer)
+
 def main():
+    # Add home button at the top
+    if st.query_params.get("report"):
+        st.markdown("""
+        <div style="text-align: center; margin-bottom: 20px;">
+            <a href="/" style="display: inline-block; background: #f0f2f6; color: #262730; padding: 10px 20px; 
+               border-radius: 20px; text-decoration: none; font-weight: bold; border: 2px solid #e0e4e8;
+               transition: all 0.3s ease;">
+                🏠 Analyze Your Own Group
+            </a>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Check if this is a shared report
+    report_id = st.query_params.get("report")
+    
+    if report_id:
+        # Load and display shared report
+        shared_data = load_shared_report(report_id)
+        if shared_data:
+            st.markdown(f"""
+            <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; margin-bottom: 30px;">
+                <h1 style="color: white; font-size: 2.5em; margin-bottom: 15px;">📱 WhatsApp Analysis</h1>
+                <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 15px; margin: 0 auto; max-width: 500px;">
+                    <p style="color: white; font-weight: bold; margin: 0;">📊 {shared_data['metadata']['message_count']:,} messages analyzed</p>
+                    <p style="color: white; margin: 5px 0 0 0; opacity: 0.8;">Created: {datetime.fromisoformat(shared_data['created_at']).strftime('%B %d, %Y')}</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Display the analysis (same view as original user)
+            display_analysis_view(shared_data['analyzer'], shared_data['share_text'], report_id)
+            
+            # Show "Analyze Your Own Group" option
+            st.markdown("---")
+            if st.button("🚀 Analyze Your Own Group Chat"):
+                st.query_params.clear()
+                st.rerun()
+            
+        else:
+            st.error("❌ **Report not found or expired**")
+            st.markdown("This shared link may have expired or is invalid. Try generating a new analysis!")
+            if st.button("🏠 Go to Home"):
+                st.query_params.clear()
+                st.rerun()
+        return
+    
     # Track page view
     log_usage_event('page_view')
     
@@ -175,159 +424,13 @@ def main():
                 # Generate shareable report
                 share_text = generate_share_report(analyzer)
                 
-                # Show the actual report that will be shared - MAIN FOCUS
-                st.markdown("---")
+                # Save the analysis and get shareable link
+                report_id = save_analysis_report(analyzer, share_text)
                 
-                # Display the shareable report with contained styling
-                import re
-                
-                # Convert WhatsApp formatting to HTML
-                def whatsapp_to_html(text):
-                    """Convert WhatsApp formatting (*bold* _italic_ ~strikethrough~) to HTML"""
-                    # First, clean up excessive spacing
-                    text = re.sub(r'\n{3,}', '\n\n', text)
-                    
-                    # Escape HTML special characters first
-                    text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                    
-                    # Convert WhatsApp formatting to HTML
-                    # Handle nested formatting by processing in the right order
-                    # First handle combinations like *_text_* (bold+italic)
-                    text = re.sub(r'\*_([^_\n]+)_\*', r'<strong><em>\1</em></strong>', text)
-                    text = re.sub(r'_\*([^*\n]+)\*_', r'<em><strong>\1</strong></em>', text)
-                    
-                    # Then handle single formatting
-                    # Bold: *text* -> <strong>text</strong>
-                    text = re.sub(r'\*([^*\n]+)\*', r'<strong>\1</strong>', text)
-                    
-                    # Italic: _text_ -> <em>text</em>
-                    text = re.sub(r'_([^_\n]+)_', r'<em>\1</em>', text)
-                    
-                    # Strikethrough: ~text~ -> <s>text</s>
-                    text = re.sub(r'~([^~\n]+)~', r'<s>\1</s>', text)
-                    
-                    # Monospace: ```text``` -> <code>text</code>
-                    text = re.sub(r'```([^`\n]+)```', r'<code>\1</code>', text)
-                    
-                    return text
-                
-                html_text = whatsapp_to_html(share_text)
-                
-                # Handle line breaks more carefully
-                # Split into paragraphs and process
-                paragraphs = html_text.split('\n\n')
-                processed_paragraphs = []
-                
-                for para in paragraphs:
-                    if para.strip():
-                        # For regular paragraphs, replace single newlines with spaces (for flowing text)
-                        # But keep bullet points on separate lines
-                        lines = para.split('\n')
-                        processed_lines = []
-                        for line in lines:
-                            if line.strip().startswith('•') or line.strip().startswith('<h') or line.strip().startswith('</h'):
-                                processed_lines.append(line.strip())
-                            else:
-                                processed_lines.append(line.strip())
-                        processed_paragraphs.append('<br>'.join(processed_lines))
-                
-                html_text = '</p><p style="margin: 10px 0;">'.join(processed_paragraphs)
-                html_text = '<p style="margin: 10px 0;">' + html_text + '</p>'
-                
-                st.markdown(f"""
-                <div style="
-                    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-                    padding: 25px;
-                    border-radius: 15px;
-                    border: 2px solid #25D366;
-                    margin: 20px 0;
-                    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.15);
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                    font-size: 16px;
-                    line-height: 1.6;
-                    color: #1a202c;
-                ">
-                {html_text}
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Mobile-optimized WhatsApp sharing
-                import urllib.parse
-                encoded_text = urllib.parse.quote(share_text)
-                whatsapp_url = f"https://api.whatsapp.com/send?text={encoded_text}"
-                
-                # Track when share button is displayed (indicates successful analysis)
-                log_usage_event('share_displayed')
-                
-                # Single prominent share button
-                st.markdown(f"""
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="{whatsapp_url}" target="_blank" style="
-                        display: inline-block;
-                        background: linear-gradient(135deg, #25D366, #128C7E);
-                        color: white;
-                        padding: 20px 40px;
-                        border-radius: 50px;
-                        text-decoration: none;
-                        font-size: 20px;
-                        font-weight: bold;
-                        box-shadow: 0 6px 20px rgba(37, 211, 102, 0.4);
-                        transition: all 0.3s ease;
-                        border: none;
-                        cursor: pointer;
-                        min-width: 280px;
-                    ">
-                        💬 Share
-                    </a>
-                </div>
-                <div style="text-align: center; color: #666; font-size: 16px; margin-bottom: 20px;">
-                    Tap to send this to your group! 👆
-                </div>
-                """, unsafe_allow_html=True)
-                
-                
-                st.markdown("---")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.metric("💬 Total Messages", f"{len(df):,}")
-                    st.metric("👥 People in Group", len(df['sender'].unique()))
-                
-                with col2:
-                    total_days = (df['timestamp'].max() - df['timestamp'].min()).days
-                    msgs_per_day = len(df) / max(total_days, 1)
-                    st.metric("📅 Days of Chat", total_days)
-                    st.metric("🔥 Messages per Day", f"{msgs_per_day:.1f}")
-                
-                # Consumer-focused detailed insights
-                st.markdown("""
-                <div style="text-align: center; margin: 30px 0; padding: 20px; background: linear-gradient(45deg, #667eea, #764ba2); border-radius: 15px;">
-                    <h2 style="color: white; margin: 0;">🕵️ Dive Deeper Into The Drama</h2>
-                    <p style="color: white; opacity: 0.9; margin-top: 10px;">Click each section to uncover more juicy secrets!</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                with st.expander("📈 Your Group's Chatting Patterns", expanded=True):
-                    display_overview(df, analyzer)
-                
-                with st.expander("👑 The Conversation Rulers"):
-                    display_top_chatters(analyzer)
-                
-                with st.expander("😇 Angels vs Devils in Your Group"):
-                    display_sentiment(analyzer)
-                
-                with st.expander("🔥 Your Group's Obsessions Exposed"):
-                    display_hot_topics(analyzer)
-                
-                with st.expander("💥 Topics That Cause Group Wars"):
-                    display_polarizing_topics(analyzer)
-                
-                with st.expander("🕐 When Your Group Comes Alive"):
-                    display_time_patterns(analyzer)
-                
-                with st.expander("🏆 Hall of Fame & Shame"):
-                    display_fun_awards(analyzer)
+                # Redirect to the shareable link instead of displaying here
+                if report_id:
+                    st.query_params["report"] = report_id
+                    st.rerun()
                 
                 # Clean up temporary files securely
                 try:
@@ -335,7 +438,7 @@ def main():
                     st.success("✅ Temporary files securely deleted")
                 except:
                     pass  # File might already be deleted
-                
+                    
             except Exception as e:
                 # Ensure cleanup even if there's an error
                 try:
@@ -373,6 +476,7 @@ def main():
         st.markdown("---")
         display_analytics_dashboard()
     
+
 
 def display_overview(df, analyzer):
     col1, col2 = st.columns(2)
@@ -453,78 +557,28 @@ def display_sentiment(analyzer):
 def display_hot_topics(analyzer):
     messages = [msg for msg in analyzer.df['message'] if not msg.startswith('<Media omitted>')]
     
-    # Comprehensive Indian topics
+    # Common topics
     common_topics = [
-        # Politics & Government
-        'modi', 'bjp', 'congress', 'aap', 'election', 'vote', 'parliament', 'politics', 'government', 
-        'rahul gandhi', 'amit shah', 'kejriwal', 'mamata', 'yogi', 'state election', 'lok sabha', 'rajya sabha',
-        
-        # Finance & Economy
-        'stock', 'market', 'nifty', 'sensex', 'investment', 'mutual fund', 'sip', 'fd', 'ppf', 'nsc',
-        'crypto', 'bitcoin', 'trading', 'portfolio', 'gold', 'silver', 'inflation', 'gst', 'budget',
-        'rupee', 'dollar', 'bank', 'loan', 'emi', 'insurance', 'tax', 'income tax', 'epf', 'pf',
-        
-        # International
-        'usa', 'america', 'trump', 'biden', 'china', 'pakistan', 'ukraine', 'russia', 'israel',
-        'middle east', 'europe', 'japan', 'singapore', 'dubai', 'saudi', 'immigration', 'visa',
-        
-        # Cities & States
+        'modi', 'bjp', 'congress', 'aap', 'election', 'vote', 'parliament', 'politics', 'government',
+        'stock', 'market', 'nifty', 'sensex', 'investment', 'crypto', 'bitcoin', 'trading', 'gold',
+        'usa', 'america', 'trump', 'biden', 'china', 'pakistan', 'ukraine', 'russia',
         'bangalore', 'bengaluru', 'mumbai', 'delhi', 'chennai', 'hyderabad', 'pune', 'kolkata',
-        'gurgaon', 'noida', 'karnataka', 'maharashtra', 'tamil nadu', 'kerala', 'gujarat', 'rajasthan',
-        'uttar pradesh', 'bihar', 'west bengal', 'telangana', 'andhra pradesh',
-        
-        # Technology & Work
-        'work', 'job', 'salary', 'appraisal', 'promotion', 'interview', 'tech', 'software', 'ai',
-        'google', 'microsoft', 'amazon', 'infosys', 'tcs', 'wipro', 'startup', 'coding', 'python',
-        'java', 'cloud', 'aws', 'azure', 'meeting', 'office', 'wfh', 'remote', 'onsite',
-        
-        # Entertainment & Sports
-        'movie', 'bollywood', 'hollywood', 'netflix', 'amazon prime', 'hotstar', 'film', 'actor',
-        'cricket', 'ipl', 'world cup', 'kohli', 'dhoni', 'rohit', 'football', 'fifa', 'olympics',
-        'tennis', 'badminton', 'kabaddi', 'hockey', 'sports',
-        
-        # Food & Culture
-        'food', 'biryani', 'dosa', 'samosa', 'chai', 'coffee', 'restaurant', 'zomato', 'swiggy',
-        'lunch', 'dinner', 'breakfast', 'street food', 'festival', 'diwali', 'holi', 'eid',
-        'ganesh chaturthi', 'durga puja', 'navratri', 'dussehra', 'karva chauth', 'wedding',
-        
-        # Transportation & Travel
-        'uber', 'ola', 'auto', 'metro', 'train', 'flight', 'airport', 'traffic', 'petrol',
-        'diesel', 'car', 'bike', 'travel', 'vacation', 'holiday', 'goa', 'kerala', 'kashmir',
-        'himachal', 'uttarakhand', 'rajasthan', 'abroad',
-        
-        # Daily Life
-        'house', 'rent', 'flat', 'apartment', 'pg', 'roommate', 'electricity', 'water', 'wifi',
-        'shopping', 'flipkart', 'amazon', 'myntra', 'grocery', 'vegetables', 'market',
-        'hospital', 'doctor', 'medicine', 'health', 'gym', 'fitness',
-        
-        # Social & Personal
-        'family', 'parents', 'marriage', 'relationship', 'friends', 'party', 'weekend', 'birthday',
-        'anniversary', 'plan', 'tomorrow', 'tonight', 'meeting', 'college', 'school', 'education',
-        'exam', 'results', 'admission', 'congrats', 'congratulations',
-        
-        # Weather & Seasons
-        'weather', 'rain', 'monsoon', 'summer', 'winter', 'heat', 'cold', 'humidity', 'climate',
-        
-        # Religion & Spirituality
-        'temple', 'church', 'mosque', 'gurudwara', 'god', 'prayer', 'bhajan', 'mandir', 'devotion',
-        'spiritual', 'meditation', 'yoga',
-        
-        # News & Current Events
-        'news', 'breaking news', 'update', 'corona', 'covid', 'vaccine', 'lockdown', 'pandemic',
-        'economy', 'recession', 'growth', 'development'
+        'work', 'job', 'salary', 'tech', 'software', 'ai', 'google', 'microsoft', 'amazon',
+        'movie', 'bollywood', 'hollywood', 'netflix', 'cricket', 'ipl', 'kohli', 'dhoni',
+        'food', 'biryani', 'restaurant', 'zomato', 'swiggy', 'festival', 'diwali', 'holi',
+        'uber', 'ola', 'metro', 'train', 'flight', 'travel', 'vacation', 'goa', 'kerala',
+        'house', 'rent', 'flat', 'shopping', 'flipkart', 'family', 'friends', 'party', 'weekend',
+        'weather', 'rain', 'monsoon', 'covid', 'vaccine', 'lockdown', 'congrats', 'congratulations',
+        'good morning', 'good night', 'happy anniversary'
     ]
     
     topic_counts = {}
     import re
     for topic in common_topics:
-        # Use word boundary matching for short topics to avoid false positives
         if len(topic) <= 3 and ' ' not in topic:
-            # For short single words, use word boundaries
             pattern = r'\b' + re.escape(topic.lower()) + r'\b'
             count = sum(1 for msg in messages if re.search(pattern, msg.lower()))
         else:
-            # For longer words and phrases, use substring matching
             count = sum(1 for msg in messages if topic.lower() in msg.lower())
         if count > 0:
             topic_counts[topic.capitalize()] = count
@@ -551,14 +605,13 @@ def display_polarizing_topics(analyzer):
     
     topic_sentiments = defaultdict(list)
     topics_to_check = [
-        # High polarization topics
         'trump', 'biden', 'usa', 'china', 'pakistan', 'election', 'politics', 'modi', 'bjp', 'congress',
-        'crypto', 'bitcoin', 'stock', 'market', 'investment', 'gold', 'economy', 'recession',
-        'movie', 'bollywood', 'cricket', 'kohli', 'dhoni', 'ipl', 'football',
-        'work', 'salary', 'job', 'office', 'wfh', 'onsite', 
-        'bangalore', 'mumbai', 'delhi', 'traffic', 'rent', 'house',
-        'food', 'restaurant', 'biryani', 'weekend', 'party', 'travel', 'vacation',
-        'weather', 'rain', 'monsoon', 'summer', 'covid', 'vaccine', 'lockdown'
+        'crypto', 'bitcoin', 'stock', 'market', 'investment', 'gold',
+        'movie', 'bollywood', 'cricket', 'kohli', 'dhoni', 'ipl',
+        'work', 'salary', 'job', 'office', 'wfh',
+        'bangalore', 'mumbai', 'delhi', 'traffic', 'rent',
+        'food', 'restaurant', 'weekend', 'party', 'travel',
+        'weather', 'rain', 'covid', 'vaccine', 'lockdown'
     ]
     
     for _, row in analyzer.df.iterrows():
