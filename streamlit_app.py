@@ -1038,8 +1038,6 @@ Based on *{len(df):,} messages* from *{len(df['sender'].unique())} participants*
 
 --------------------
 
---------------------
-
 📊 *GROUP DYNAMICS AT A GLANCE*
 • *Daily average:* {msgs_per_day:.1f} messages ({activity_desc.replace('🔥', '').replace('💬', '').replace('😌', '').strip()})
 
