@@ -20,21 +20,77 @@ class WhatsAppAnalyzer:
         
     def parse_chat(self):
         """Parse WhatsApp chat export"""
-        pattern = r'\[(\d{2}/\d{2}/\d{2}),\s(\d{1,2}:\d{2}:\d{2}\s[AP]M)\]\s([^:]+):\s(.+)'
+        # Try multiple patterns to support different WhatsApp export formats
+        patterns = [
+            # Format: dd/mm/yyyy, HH:mm - Name: Message (24-hour format, most common)
+            r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2})\s-\s([^:]+):\s(.+)',
+            # Format: [dd/mm/yy, h:mm:ss AM/PM] Name: Message
+            r'\[(\d{2}/\d{2}/\d{2}),\s(\d{1,2}:\d{2}:\d{2}\s[AP]M)\]\s([^:]+):\s(.+)',
+            # Format: dd/mm/yyyy, h:mm AM/PM - Name: Message
+            r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}\s[ap]m)\s-\s([^:]+):\s(.+)',
+            # Format: mm/dd/yy, h:mm AM/PM - Name: Message (US format)
+            r'(\d{1,2}/\d{1,2}/\d{2}),\s(\d{1,2}:\d{2}\s[AP]M)\s-\s([^:]+):\s(.+)'
+        ]
         
         with open(self.file_path, 'r', encoding='utf-8') as file:
             lines = file.readlines()
         
         current_msg = None
+        matched_pattern = None
+        
+        # Try to find which pattern matches
+        for pattern in patterns:
+            for line in lines[:10]:  # Check first 10 lines
+                if re.match(pattern, line):
+                    matched_pattern = pattern
+                    break
+            if matched_pattern:
+                break
+        
+        if not matched_pattern:
+            matched_pattern = patterns[0]  # Default to first pattern
+        
         for line in lines:
-            match = re.match(pattern, line)
+            match = re.match(matched_pattern, line)
             if match:
                 if current_msg:
                     self.messages.append(current_msg)
                 
                 date_str, time_str, sender, message = match.groups()
-                timestamp_str = f"{date_str}, {time_str}"
-                timestamp = datetime.strptime(timestamp_str, '%d/%m/%y, %I:%M:%S %p')
+                
+                # Parse timestamp based on the matched pattern format
+                try:
+                    if 'AM' in time_str.upper() or 'PM' in time_str.upper():
+                        # 12-hour format with seconds
+                        if ':' in time_str and time_str.count(':') == 2:
+                            if '/' in date_str and len(date_str.split('/')[2]) == 2:
+                                timestamp = datetime.strptime(f"{date_str}, {time_str}", '%d/%m/%y, %I:%M:%S %p')
+                            else:
+                                timestamp = datetime.strptime(f"{date_str}, {time_str}", '%d/%m/%Y, %I:%M:%S %p')
+                        # 12-hour format without seconds
+                        else:
+                            if '/' in date_str and len(date_str.split('/')[2]) == 2:
+                                timestamp = datetime.strptime(f"{date_str}, {time_str}", '%d/%m/%y, %I:%M %p')
+                            else:
+                                timestamp = datetime.strptime(f"{date_str}, {time_str}", '%d/%m/%Y, %I:%M %p')
+                    else:
+                        # 24-hour format
+                        if '/' in date_str and len(date_str.split('/')[2]) == 2:
+                            timestamp = datetime.strptime(f"{date_str}, {time_str}", '%d/%m/%y, %H:%M')
+                        else:
+                            timestamp = datetime.strptime(f"{date_str}, {time_str}", '%d/%m/%Y, %H:%M')
+                except:
+                    # Fallback: try various formats
+                    timestamp_str = f"{date_str}, {time_str}"
+                    for fmt in ['%d/%m/%y, %I:%M:%S %p', '%d/%m/%Y, %I:%M %p', '%m/%d/%y, %I:%M %p', 
+                               '%d/%m/%Y, %H:%M', '%d/%m/%y, %H:%M']:
+                        try:
+                            timestamp = datetime.strptime(timestamp_str, fmt)
+                            break
+                        except:
+                            continue
+                    else:
+                        continue  # Skip this message if we can't parse the date
                 
                 msg_text = message.strip()
                 if 'omitted' in msg_text:
