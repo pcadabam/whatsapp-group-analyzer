@@ -491,7 +491,7 @@ def display_hot_topics(analyzer):
         # Social & Personal
         'family', 'parents', 'marriage', 'relationship', 'friends', 'party', 'weekend', 'birthday',
         'anniversary', 'plan', 'tomorrow', 'tonight', 'meeting', 'college', 'school', 'education',
-        'exam', 'results', 'admission',
+        'exam', 'results', 'admission', 'congrats', 'congratulations',
         
         # Weather & Seasons
         'weather', 'rain', 'monsoon', 'summer', 'winter', 'heat', 'cold', 'humidity', 'climate',
@@ -879,6 +879,7 @@ def generate_share_report(analyzer):
         'exam', 'results', 'admission', 'baby', 'pregnancy', 'delivery', 'naming ceremony',
         'thread ceremony', 'engagement', 'bachelor party', 'bachelorette', 'sangam', 'mehendi',
         'gossip', 'fight', 'patch up', 'breakup', 'dating', 'tinder', 'bumble', 'arranged marriage',
+        'congrats', 'congratulations',
         
         # Health & Wellness (Extended)
         'covid', 'vaccine', 'booster', 'mask', 'sanitizer', 'fever', 'cough', 'cold',
