@@ -17,6 +17,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Hide Streamlit footer and menu
+hide_streamlit_style = """
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+</style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 # Add meta tags for better social sharing (limited support in Streamlit)
 st.markdown("""
 <meta property="og:title" content="WhatsApp Group Analyzer - Discover Your Group's Personality">
