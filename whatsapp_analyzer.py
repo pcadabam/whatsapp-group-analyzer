@@ -22,14 +22,55 @@ class WhatsAppAnalyzer:
         """Parse WhatsApp chat export"""
         # Try multiple patterns to support different WhatsApp export formats
         patterns = [
-            # Format: dd/mm/yyyy, HH:mm - Name: Message (24-hour format, most common)
-            r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2})\s-\s([^:]+):\s(.+)',
-            # Format: [dd/mm/yy, h:mm:ss AM/PM] Name: Message
-            r'\[(\d{2}/\d{2}/\d{2}),\s(\d{1,2}:\d{2}:\d{2}\s[AP]M)\]\s([^:]+):\s(.+)',
-            # Format: dd/mm/yyyy, h:mm AM/PM - Name: Message
-            r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}\s[ap]m)\s-\s([^:]+):\s(.+)',
-            # Format: mm/dd/yy, h:mm AM/PM - Name: Message (US format)
-            r'(\d{1,2}/\d{1,2}/\d{2}),\s(\d{1,2}:\d{2}\s[AP]M)\s-\s([^:]+):\s(.+)'
+            # US formats with brackets (iOS common)
+            r'\[(\d{1,2}/\d{1,2}/\d{2}),\s(\d{1,2}:\d{2}:\d{2}\s[AP]M)\]\s([^:]+):\s(.+)',  # [m/d/yy, h:mm:ss AM/PM]
+            r'\[(\d{1,2}/\d{1,2}/\d{4}),\s(\d{1,2}:\d{2}:\d{2}\s[AP]M)\]\s([^:]+):\s(.+)',  # [m/d/yyyy, h:mm:ss AM/PM]
+            r'\[(\d{1,2}/\d{1,2}/\d{2}),\s(\d{1,2}:\d{2}\s[AP]M)\]\s([^:]+):\s(.+)',  # [m/d/yy, h:mm AM/PM]
+            
+            # European formats with brackets
+            r'\[(\d{1,2}/\d{1,2}/\d{2}),\s(\d{1,2}:\d{2}:\d{2}\s[AP]M)\]\s([^:]+):\s(.+)',  # [d/m/yy, h:mm:ss AM/PM]
+            r'\[(\d{1,2}/\d{1,2}/\d{4}),\s(\d{1,2}:\d{2}:\d{2})\]\s([^:]+):\s(.+)',  # [d/m/yyyy, HH:mm:ss] 24hr
+            r'\[(\d{1,2}\.\d{1,2}\.\d{2}),\s(\d{1,2}:\d{2})\]\s([^:]+):\s(.+)',  # [dd.mm.yy, HH:mm] German style
+            
+            # Standard formats without brackets (Android common)
+            r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2})\s-\s([^:]+):\s(.+)',  # dd/mm/yyyy, HH:mm - Name: Message
+            r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}\s[ap]m)\s-\s([^:]+):\s(.+)',  # dd/mm/yyyy, h:mm am/pm
+            r'(\d{1,2}/\d{1,2}/\d{2}),\s(\d{1,2}:\d{2}\s[AP]M)\s-\s([^:]+):\s(.+)',  # mm/dd/yy, h:mm AM/PM
+            
+            # Dash separator formats  
+            r'(\d{1,2}-\d{1,2}-\d{2,4}),\s(\d{1,2}:\d{2})\s-\s([^:]+):\s(.+)',  # dd-mm-yyyy, HH:mm
+            r'(\d{1,2}-\d{1,2}-\d{2}),\s(\d{1,2}:\d{2}\s[AP]M)\s-\s([^:]+):\s(.+)',  # mm-dd-yy, h:mm AM/PM
+            
+            # ISO/Asian formats
+            r'(\d{4}-\d{2}-\d{2}),\s(\d{1,2}:\d{2}:\d{2})\s-\s([^:]+):\s(.+)',  # yyyy-mm-dd, HH:mm:ss
+            r'\[(\d{4}-\d{2}-\d{2}),\s(\d{1,2}:\d{2}:\d{2})\]\s([^:]+):\s(.+)',  # [yyyy-mm-dd, HH:mm:ss]
+            
+            # Formats with different spacing
+            r'(\d{1,2}/\d{1,2}/\d{2,4})\s(\d{1,2}:\d{2})\s-\s([^:]+):\s(.+)',  # No comma after date
+            r'(\d{1,2}/\d{1,2}/\d{2,4}),(\d{1,2}:\d{2})-([^:]+):\s(.+)',  # No spaces
+            
+            # Dot separator formats (some European countries)
+            r'(\d{1,2}\.\d{1,2}\.\d{2,4}),\s(\d{1,2}:\d{2})\s-\s([^:]+):\s(.+)',  # dd.mm.yyyy, HH:mm
+            r'(\d{1,2}\.\d{1,2}\.\d{2}),\s(\d{1,2}:\d{2}\s[AP]M)\s-\s([^:]+):\s(.+)',  # dd.mm.yy, h:mm AM/PM
+            
+            # Formats with seconds
+            r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}:\d{2})\s-\s([^:]+):\s(.+)',  # dd/mm/yyyy, HH:mm:ss
+            r'(\d{1,2}/\d{1,2}/\d{2}),\s(\d{1,2}:\d{2}:\d{2}\s[AP]M)\s-\s([^:]+):\s(.+)',  # mm/dd/yy, h:mm:ss AM/PM
+            
+            # WhatsApp Business formats
+            r'(\d{1,2}/\d{1,2}/\d{2,4})\sat\s(\d{1,2}:\d{2}\s[AP]M)\s-\s([^:]+):\s(.+)',  # dd/mm/yyyy at h:mm AM/PM
+            r'\[(\d{1,2}/\d{1,2}/\d{2,4})\sat\s(\d{1,2}:\d{2}\s[AP]M)\]\s([^:]+):\s(.+)',  # [dd/mm/yyyy at h:mm AM/PM]
+            
+            # Additional edge case formats
+            r'(\d{1,2}_\d{1,2}_\d{2,4}),\s(\d{1,2}:\d{2})\s-\s([^:]+):\s(.+)',  # Underscore separators
+            r'(\d{4}/\d{2}/\d{2}),\s(\d{1,2}:\d{2}:\d{2})\s-\s([^:]+):\s(.+)',  # yyyy/mm/dd format
+            r'(\d{1,2}/\d{1,2}),\s(\d{1,2}:\d{2}\s[AP]M)\s-\s([^:]+):\s(.+)',  # Missing year
+            r'(\d{1,2}/\d{1,2}/\d{2,4})\s@\s(\d{1,2}:\d{2}\s[AP]M)\s-\s([^:]+):\s(.+)',  # Using @ instead of at
+            r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}:\d{2}\.\d{3})\s-\s([^:]+):\s(.+)',  # With milliseconds
+            
+            # Formats with timezone
+            r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}\s[AP]M\s[A-Z]{3})\s-\s([^:]+):\s(.+)',  # With timezone
+            r'\[(\d{1,2}/\d{1,2}/\d{2}),\s(\d{1,2}:\d{2}:\d{2}\s[AP]M\s[A-Z]{3})\]\s([^:]+):\s(.+)',  # [date, time TZ]
         ]
         
         with open(self.file_path, 'r', encoding='utf-8') as file:
@@ -82,13 +123,61 @@ class WhatsAppAnalyzer:
                 except:
                     # Fallback: try various formats
                     timestamp_str = f"{date_str}, {time_str}"
-                    for fmt in ['%d/%m/%y, %I:%M:%S %p', '%d/%m/%Y, %I:%M %p', '%m/%d/%y, %I:%M %p', 
-                               '%d/%m/%Y, %H:%M', '%d/%m/%y, %H:%M']:
-                        try:
-                            timestamp = datetime.strptime(timestamp_str, fmt)
-                            break
-                        except:
-                            continue
+                    # Also prepare alternative versions for different separators
+                    timestamp_str_at = f"{date_str} at {time_str}"
+                    timestamp_str_amp = f"{date_str} @ {time_str}"
+                    timestamp_str_space = f"{date_str} {time_str}"
+                    for fmt in [
+                        # US formats (month/day/year)
+                        '%m/%d/%y, %I:%M:%S %p', '%m/%d/%Y, %I:%M:%S %p',
+                        '%m/%d/%y, %I:%M %p', '%m/%d/%Y, %I:%M %p',
+                        '%m/%d/%y, %H:%M:%S', '%m/%d/%Y, %H:%M:%S',
+                        '%m/%d/%y, %H:%M', '%m/%d/%Y, %H:%M',
+                        # European formats (day/month/year)
+                        '%d/%m/%y, %I:%M:%S %p', '%d/%m/%Y, %I:%M:%S %p',
+                        '%d/%m/%y, %I:%M %p', '%d/%m/%Y, %I:%M %p',
+                        '%d/%m/%y, %H:%M:%S', '%d/%m/%Y, %H:%M:%S',
+                        '%d/%m/%y, %H:%M', '%d/%m/%Y, %H:%M',
+                        # Dash separators
+                        '%d-%m-%y, %H:%M:%S', '%d-%m-%Y, %H:%M:%S',
+                        '%d-%m-%y, %H:%M', '%d-%m-%Y, %H:%M',
+                        '%m-%d-%y, %I:%M %p', '%m-%d-%Y, %I:%M %p',
+                        # Dot separators (German/European)
+                        '%d.%m.%y, %H:%M:%S', '%d.%m.%Y, %H:%M:%S',
+                        '%d.%m.%y, %H:%M', '%d.%m.%Y, %H:%M',
+                        # ISO format
+                        '%Y-%m-%d, %H:%M:%S', '%Y-%m-%d, %H:%M',
+                        # WhatsApp Business "at" format
+                        '%d/%m/%y at %I:%M %p', '%d/%m/%Y at %I:%M %p',
+                        '%m/%d/%y at %I:%M %p', '%m/%d/%Y at %I:%M %p',
+                        # Without comma
+                        '%d/%m/%y %H:%M:%S', '%d/%m/%Y %H:%M:%S',
+                        '%m/%d/%y %I:%M:%S %p', '%m/%d/%Y %I:%M:%S %p',
+                        # Underscore separators
+                        '%d_%m_%y, %H:%M', '%d_%m_%Y, %H:%M',
+                        '%m_%d_%y, %I:%M %p', '%m_%d_%Y, %I:%M %p',
+                        # yyyy/mm/dd and yyyy-mm-dd formats
+                        '%Y/%m/%d, %H:%M:%S', '%Y/%m/%d, %H:%M',
+                        '%Y/%m/%d, %I:%M %p', '%Y/%m/%d, %I:%M:%S %p',
+                        # Using @ instead of at
+                        '%d/%m/%y @ %I:%M %p', '%d/%m/%Y @ %I:%M %p',
+                        '%m/%d/%y @ %I:%M %p', '%m/%d/%Y @ %I:%M %p',
+                        # With milliseconds (ignore milliseconds)
+                        '%d/%m/%Y, %H:%M:%S.%f', '%m/%d/%Y, %H:%M:%S.%f',
+                        # Formats with timezone (ignoring timezone for now)
+                        '%d/%m/%y, %I:%M %p %Z', '%d/%m/%Y, %I:%M %p %Z',
+                        '%m/%d/%y, %I:%M %p %Z', '%m/%d/%Y, %I:%M %p %Z'
+                    ]:
+                        # Try different separator variations
+                        for test_str in [timestamp_str, timestamp_str_at, timestamp_str_amp, timestamp_str_space]:
+                            try:
+                                timestamp = datetime.strptime(test_str, fmt)
+                                break
+                            except:
+                                continue
+                        else:
+                            continue  # Continue to next format
+                        break  # Break from format loop if successful
                     else:
                         continue  # Skip this message if we can't parse the date
                 
